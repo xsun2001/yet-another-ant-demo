@@ -2,10 +2,10 @@
 import { ref, Ref } from "@vue/reactivity";
 import Konva from "konva";
 import { watch } from "vue";
-import { GameData } from "../utils/GameData";
-import * as Coord from "../utils/CoordUtils";
-import { DefaultConfig } from "../utils/GameConfig";
-import { renderConfig, idx2pos } from "../utils/Utils";
+import { GameData } from "./GameData";
+import * as Coord from "./CoordUtils";
+import { DefaultConfig } from "./GameConfig";
+import { renderConfig, idx2pos } from "./Utils";
 
 /*
  * Editor mode

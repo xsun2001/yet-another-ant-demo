@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import "./style.css";
-import App from "./App.vue";
+import AntDemo from "./AntDemo.vue";
 
 // Vuetify
 import "vuetify/styles";
@@ -13,4 +13,4 @@ const vuetify = createVuetify({
   directives,
 });
 
-createApp(App).use(vuetify).mount("#app");
+createApp(AntDemo).use(vuetify).mount("#app");

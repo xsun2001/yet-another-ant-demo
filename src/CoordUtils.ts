@@ -56,12 +56,7 @@ function evenqOffsetNeighbor(hex: OffsetCoord, direction: number): OffsetCoord {
 }
 
 function axialDistance(a: Hex, b: Hex): number {
-  return (
-    (Math.abs(a.q - b.q) +
-      Math.abs(a.q + a.r - b.q - b.r) +
-      Math.abs(a.r - b.r)) /
-    2
-  );
+  return (Math.abs(a.q - b.q) + Math.abs(a.q + a.r - b.q - b.r) + Math.abs(a.r - b.r)) / 2;
 }
 
 function evenqDistance(a: OffsetCoord, b: OffsetCoord): number {
@@ -108,12 +103,7 @@ export function neighbor(x: number, y: number, dir: number): [number, number] {
   return [neighbor.row, neighbor.col];
 }
 
-export function distance(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number
-): number {
+export function distance(x1: number, y1: number, x2: number, y2: number): number {
   let a = new OffsetCoord(y1, x1);
   let b = new OffsetCoord(y2, x2);
   return evenqDistance(a, b);
