@@ -1,7 +1,14 @@
 import Konva from "konva";
 import * as Coord from "./CoordUtils";
 import { GameConfig, PheromoneConfig, TowerConfig } from "./GameConfig";
-import { arrayEq, genArray, idx2pos, probabilityChoose, renderConfig, twodimArray } from "./Utils";
+import {
+  arrayEq,
+  genArray,
+  coord2screen,
+  probabilityChoose,
+  renderConfig,
+  twodimArray,
+} from "./Utils";
 
 enum AntState {
   Alive,
@@ -201,7 +208,7 @@ export class Pheromone {
       let [x, y] = coord;
       for (let ring of Coord.inRing(x, y, radius)) {
         let [rx, ry] = ring;
-        if (Coord.isIdxValid(rx, ry, this.len) && !mask[rx][ry]) {
+        if (Coord.isCoordValid(rx, ry, this.len) && !mask[rx][ry]) {
           mask[rx][ry] = true;
           this.pointModify([rx, ry], delta);
         }
@@ -256,7 +263,7 @@ export class Pheromone {
   moveProbability(ant: Ant, highlandMask: boolean[][], target: [number, number]): number[] {
     let prob = genArray(6, () => 0);
     let coord = genArray(6, (dir) => Coord.neighbor(ant.x, ant.y, dir));
-    let valid = coord.map(([x, y]) => Coord.isIdxValid(x, y, this.len) && !highlandMask[x][y]);
+    let valid = coord.map(([x, y]) => Coord.isCoordValid(x, y, this.len) && !highlandMask[x][y]);
     let tau = coord.map(([x, y], dir) =>
       valid[dir] ? Math.pow(this.value[x][y], this.config.alpha) : 0
     );
@@ -353,6 +360,49 @@ export class GameData {
     }
   }
 
+  toggleHighland(x: number, y: number) {
+    if (
+      Coord.isCoordValid(x, y, this.len) &&
+      !arrayEq([x, y], this.hqPos[0]) &&
+      !arrayEq([x, y], this.hqPos[1])
+    ) {
+      this.highlandMask[x][y] = !this.highlandMask[x][y];
+    }
+  }
+
+  resetHighland() {
+    this.highlandMask = twodimArray(2 * this.len - 1, () => false);
+  }
+
+  importHighland(imported: string): boolean {
+    this.resetHighland();
+    const parts = imported.split(/\s+/);
+    if (parts.length % 2 !== 0) {
+      console.warn("Invalid import design");
+      return false;
+    }
+    for (let i = 0; i < parts.length; i += 2) {
+      const [x, y] = [parseInt(parts[i]), parseInt(parts[i + 1])];
+      if (!isNaN(x) && !isNaN(y) && Coord.isCoordValid(x, y, this.len)) {
+        this.highlandMask[x][y] = true;
+      } else {
+        console.warn(`Invalid coordinate [${x}, ${y}] in import design`);
+      }
+    }
+    return true;
+  }
+
+  exportHighland(): string {
+    let exported = "";
+    for (let coord of Coord.inDistance(this.len - 1, this.len - 1, this.len - 1)) {
+      let [x, y] = coord;
+      if (this.highlandMask[x][y]) {
+        exported = exported.concat(x.toString(), " ", y.toString(), "\n");
+      }
+    }
+    return exported;
+  }
+
   nextStep(canvas: Konva.Layer | null = null) {
     let tweenList: Konva.Tween[] = [];
 
@@ -445,7 +495,7 @@ export class GameData {
       if (canvas) {
         let antShape = canvas.findOne(`#ANT-${ant.id}`);
         if (antShape) {
-          let [nsx, nsy] = idx2pos(nx, ny); // new screen x/y
+          let [nsx, nsy] = coord2screen(nx, ny); // new screen x/y
           tweenList.push(
             new Konva.Tween({
               node: antShape,
@@ -475,7 +525,7 @@ export class GameData {
         let ant = new Ant(this.barracks.useNextIdx(), barrack.player, barrack.x, barrack.y, 10);
         this.ants.data.push(ant);
         if (canvas) {
-          let [sx, sy] = idx2pos(ant.x, ant.y);
+          let [sx, sy] = coord2screen(ant.x, ant.y);
           let antShape = new Konva.Circle({
             x: sx,
             y: sy,

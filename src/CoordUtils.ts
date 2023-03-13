@@ -123,6 +123,6 @@ export function* inRing(x: number, y: number, dist: number) {
   }
 }
 
-export function isIdxValid(x: number, y: number, mapLen: number): boolean {
+export function isCoordValid(x: number, y: number, mapLen: number): boolean {
   return distance(x, y, mapLen - 1, mapLen - 1) < mapLen;
 }

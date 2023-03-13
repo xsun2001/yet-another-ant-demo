@@ -31,13 +31,15 @@ export function probabilityChoose(prob: number[]): number {
   return prob.length - 1;
 }
 
+// TODO: Configurable
 export const renderConfig = {
   cellRadius: 20,
   offsetX: 50,
   offsetY: 50,
 };
 
-export function idx2pos(x: number, y: number): [number, number] {
+// Coordinate to Screen position
+export function coord2screen(x: number, y: number): [number, number] {
   let posY = x * renderConfig.cellRadius * Math.sqrt(3) + renderConfig.offsetX;
   if (y % 2 == 0) {
     posY += (renderConfig.cellRadius * Math.sqrt(3)) / 2;

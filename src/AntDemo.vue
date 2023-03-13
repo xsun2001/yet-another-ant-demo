@@ -5,7 +5,7 @@ import { watch } from "vue";
 import { GameData } from "./GameData";
 import * as Coord from "./CoordUtils";
 import { DefaultConfig } from "./GameConfig";
-import { renderConfig, idx2pos } from "./Utils";
+import { renderConfig, coord2screen, arrayEq } from "./Utils";
 
 /*
  * Editor mode
@@ -26,14 +26,29 @@ import { renderConfig, idx2pos } from "./Utils";
  * 3. nextStep -> Ant Delta -> Create new ant node / Animate ant / Remove dead nodes
  */
 
-const mapLen = ref(10);
 const editorMode = ref(true);
 
+const round = ref(0);
+const mapLen = ref(10);
 const konva_stage: Ref<Konva.Stage | null> = ref(null);
-let main_layer: Konva.Layer | null = null;
 
-let gameData: GameData | null = null;
-let round = ref(0);
+let bgLayer: Konva.Layer | null;
+let mainLayer: Konva.Layer | null;
+let gameData: GameData | null;
+
+function updateCellColor(x: number, y: number, cell: Konva.RegularPolygon) {
+  if (gameData) {
+    if (arrayEq([x, y], gameData.hqPos[0])) {
+      cell.fill("red");
+    } else if (arrayEq([x, y], gameData.hqPos[1])) {
+      cell.fill("blue");
+    } else if (gameData.highlandMask[x][y]) {
+      cell.fill("orange");
+    } else {
+      cell.fill("lightblue");
+    }
+  }
+}
 
 watch([konva_stage, mapLen], ([stage, len]: [Konva.Stage | null, number]) => {
   if (stage == null) {
@@ -43,41 +58,30 @@ watch([konva_stage, mapLen], ([stage, len]: [Konva.Stage | null, number]) => {
     console.warn(`Invalid map len ${len}`);
     return;
   }
+
   gameData = new GameData(len, DefaultConfig);
+
   stage.destroyChildren();
-  main_layer = new Konva.Layer({
-    id: "main",
-  });
-  for (let pos of Coord.inDistance(len - 1, len - 1, len - 1)) {
-    let [x, y] = pos;
-    let fill = "lightblue";
-    const isHq0 = x == gameData.hqPos[0][0] && y == gameData.hqPos[0][1];
-    const isHq1 = x == gameData.hqPos[1][0] && y == gameData.hqPos[1][1];
-    if (isHq0) fill = "red";
-    if (isHq1) fill = "blue";
-    const hex = new Konva.RegularPolygon({
-      x: idx2pos(x, y)[0],
-      y: idx2pos(x, y)[1],
+
+  bgLayer = new Konva.Layer();
+  for (let coord of Coord.inDistance(len - 1, len - 1, len - 1)) {
+    let [x, y] = coord;
+    let [px, py] = coord2screen(x, y);
+    const cell = new Konva.RegularPolygon({
+      x: px,
+      y: py,
+      id: `CELL-${x}-${y}`,
       sides: 6,
       radius: renderConfig.cellRadius,
-      fill,
       stroke: "black",
       strokeWidth: 2,
       rotation: 90,
     });
-    hex.on("mousedown", () => {
+    cell.on("mousedown", () => {
       if (gameData) {
         if (editorMode.value) {
-          if (isHq0 || isHq1) {
-            return;
-          }
-          if (gameData.highlandMask[x][y]) {
-            gameData.highlandMask[x][y] = false;
-            hex.fill("lightblue");
-          } else {
-            gameData.highlandMask[x][y] = true;
-            hex.fill("orange");
-          }
+          gameData.toggleHighland(x, y);
+          updateCellColor(x, y, cell);
         } else {
           // Show information
         }
@@ -85,10 +89,16 @@ watch([konva_stage, mapLen], ([stage, len]: [Konva.Stage | null, number]) => {
         console.warn("GameData object is null");
       }
     });
-    main_layer.add(hex);
+    updateCellColor(x, y, cell);
+    bgLayer.add(cell);
   }
-  stage.add(main_layer);
-  main_layer.draw();
+  stage.add(bgLayer);
+  bgLayer.draw();
+
+  mainLayer = new Konva.Layer();
+  mainLayer.listening(false);
+  stage.add(mainLayer);
+  mainLayer.draw();
 });
 
 const vKonvaDiv = {
@@ -102,9 +112,35 @@ const vKonvaDiv = {
   },
 };
 
+function finishEditing() {
+  editorMode.value = false;
+}
+
+const importDesignShow = ref(false);
+const imported = ref("");
+function importDesign() {
+  if (gameData) {
+    gameData.importHighland(imported.value);
+    imported.value = "";
+    for (let coord of Coord.inDistance(mapLen.value - 1, mapLen.value - 1, mapLen.value - 1)) {
+      let [x, y] = coord;
+      let cell = bgLayer?.findOne(`#CELL-${x}-${y}`) as Konva.RegularPolygon;
+      updateCellColor(x, y, cell);
+    }
+  }
+  importDesignShow.value = false;
+}
+
+const exportDesignShow = ref(false);
+let exported: string | undefined;
+function exportDesign() {
+  exported = gameData?.exportHighland();
+  exportDesignShow.value = true;
+}
+
 function nextRound() {
   if (gameData) {
-    gameData.nextStep(main_layer);
+    gameData.nextStep(mainLayer);
     round.value = gameData.round;
   }
 }
@@ -113,19 +149,49 @@ function nextRound() {
 <template>
   <v-layout>
     <v-navigation-drawer width="300">
-      <v-card style="margin: 10px; width: 280px" title="Map Len">
+      <!-- Editor Mode Card -->
+      <v-card title="Editor Mode" v-if="editorMode">
         <v-card-text>
-          <v-text-field type="number" v-model:model-value="mapLen"></v-text-field>
+          <v-text-field label="MapLen" type="number" v-model:model-value="mapLen"></v-text-field>
         </v-card-text>
-      </v-card>
-
-      <v-card style="margin: 10px; width: 280px">
-        <v-card-title>Round: {{ gameData?.round }}</v-card-title>
         <v-card-actions>
-          <v-btn @click="nextRound">Next Round</v-btn>
+          <v-btn color="primary" @click="finishEditing">Finish</v-btn>
+          <v-btn color="secondary" @click="importDesignShow = true">Import</v-btn>
+          <v-btn color="secondary" @click="exportDesign">Export</v-btn>
         </v-card-actions>
       </v-card>
+
+      <div v-else>
+        <v-card>
+          <v-card-title>Round: {{ round }}</v-card-title>
+          <v-card-actions>
+            <v-btn @click="nextRound">Next Round</v-btn>
+          </v-card-actions>
+        </v-card>
+      </div>
     </v-navigation-drawer>
+
+    <v-dialog v-model="importDesignShow">
+      <v-card title="Import Design">
+        <v-card-text>
+          <v-textarea v-model:model-value="imported"></v-textarea>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="success" block @click="importDesign">Ok</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="exportDesignShow">
+      <v-card title="Export Design">
+        <v-card-text>
+          <v-textarea :model-value="exported"></v-textarea>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="primary" block @click="exportDesignShow = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-app-bar title="Just Another Ant Demo"></v-app-bar>
 
@@ -134,3 +200,10 @@ function nextRound() {
     </v-main>
   </v-layout>
 </template>
+
+<style scoped>
+.v-navigation-drawer .v-card {
+  margin: 10px;
+  width: 280px;
+}
+</style>
