@@ -144,6 +144,18 @@ function nextRound() {
     round.value = gameData.round;
   }
 }
+
+const autoPlaying = ref(false);
+let autoTimer: number | undefined;
+function autoPlay() {
+  if (autoPlaying.value) {
+    window.clearInterval(autoTimer);
+    autoPlaying.value = false;
+  } else {
+    autoTimer = window.setInterval(nextRound, 750);
+    autoPlaying.value = true;
+  }
+}
 </script>
 
 <template>
@@ -165,7 +177,13 @@ function nextRound() {
         <v-card>
           <v-card-title>Round: {{ round }}</v-card-title>
           <v-card-actions>
-            <v-btn @click="nextRound">Next Round</v-btn>
+            <v-btn @click="nextRound" color="primary">Next Round</v-btn>
+            <v-btn
+              :prepend-icon="autoPlaying ? 'mdi-pause' : 'mdi-play'"
+              :color="autoPlaying ? 'warning' : 'success'"
+              @click="autoPlay"
+              >AutoPlay</v-btn
+            >
           </v-card-actions>
         </v-card>
       </div>

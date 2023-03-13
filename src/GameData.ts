@@ -462,6 +462,7 @@ export class GameData {
 
     // 3. Ant move
     console.log("Ant move");
+    let reachedAnts: number[] = [];
     this.ants.data.forEach((ant) => {
       // Frozen check
       if (ant.state === AntState.Frozen) {
@@ -489,6 +490,7 @@ export class GameData {
         this.hqHp[1 - ant.player] -= 1;
         console.log(`HQ of player ${1 - ant.player} is attacked by ${ant.id}`);
         this.pheromone[ant.player].onDead(ant);
+        reachedAnts.push(ant.id);
       }
 
       // Animation
@@ -514,6 +516,7 @@ export class GameData {
         }
       }
     });
+    this.ants.data = this.ants.data.filter((ant) => !reachedAnts.includes(ant.id));
 
     // 4. Generate new ants
     console.log("Generate new ants");
