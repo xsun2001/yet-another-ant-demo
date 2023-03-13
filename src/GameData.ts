@@ -376,7 +376,7 @@ export class GameData {
 
   importHighland(imported: string): boolean {
     this.resetHighland();
-    const parts = imported.split(/\s+/);
+    const parts = imported.split(/\s+/).filter((x) => x.length > 0);
     if (parts.length % 2 !== 0) {
       console.warn("Invalid import design");
       return false;
@@ -540,7 +540,9 @@ export class GameData {
             id: `ANT-${ant.id}`,
           });
           canvas.add(antShape);
-          tweenList.push(new Konva.Tween({ node: antShape, duration: animationInterval / 1000, opacity: 1 }));
+          tweenList.push(
+            new Konva.Tween({ node: antShape, duration: animationInterval / 1000, opacity: 1 })
+          );
         }
         barrack.cd = this.config.barrackCd;
       }

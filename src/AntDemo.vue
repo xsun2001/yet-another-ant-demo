@@ -113,9 +113,16 @@ const vKonvaDiv = {
     if (isNaN(mapLen) || mapLen < 3 || mapLen >= 16) mapLen = 10;
 
     const gameConfigStr = localStorage.getItem("gameConfig");
-    let gameConfig = gameConfigStr ? (JSON.parse(gameConfigStr) as GameConfig) : DefaultConfig;
+    let gameConfig = DefaultConfig;
+    try {
+      if (gameConfigStr) gameConfig = GameConfig.parse(JSON.parse(gameConfigStr));
+    } catch (e) {
+      console.warn("Failed to parse game config from localStorage", e);
+    }
 
     gameData = new GameData(mapLen, gameConfig);
+    const highlandMaskStr = localStorage.getItem("highlandMask");
+    if (highlandMaskStr) gameData.importHighland(highlandMaskStr);
 
     // Construct Konva Stage
     const stage = new Konva.Stage({
@@ -184,10 +191,10 @@ function showConfigDialog() {
 function saveConfig() {
   try {
     const config = GameConfig.parse(JSON.parse(configString.value));
+    localStorage.setItem("gameConfig", configString.value);
     gameData!.config = config;
   } catch (e) {
-    console.warn("Cannot parse config string");
-    console.warn(configString);
+    console.warn("Cannot parse config string", e);
   }
   configDialogShow.value = false;
 }
@@ -278,7 +285,7 @@ function saveConfig() {
       </v-card>
     </v-dialog>
 
-    <v-app-bar title="Just Another Ant Demo"></v-app-bar>
+    <v-app-bar title="Yet Another Ant Demo"></v-app-bar>
 
     <v-main style="min-height: 500px">
       <div style="height: 100vh" v-konva-div />
