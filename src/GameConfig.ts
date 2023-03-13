@@ -1,49 +1,57 @@
-export interface TowerConfig {
-  id: number;
-  name: string;
-  damage: number;
-  range: number;
-  interval: number;
-  attack: {
-    type: string;
-    attackCount?: number;
-    targetCount?: number;
-    aoeRange?: number;
-  };
-  baseId: number;
-  color: string;
-}
+import { z } from "zod";
 
-export interface PheromoneConfig {
+export const TowerConfig = z.object({
+  id: z.number().refine((v) => v >= 0),
+  name: z.string(),
+  damage: z.number().refine((v) => v > 0),
+  range: z.number().refine((v) => v > 0),
+  interval: z.number().refine((v) => v > 0),
+  attack: z.object({
+    type: z.string(),
+    attackCount: z.number().optional(),
+    targetCount: z.number().optional(),
+    aoeRange: z.number().optional(),
+  }),
+  baseId: z.number().refine((v) => v >= 0),
+  color: z.string().refine((v) => /^#[0-9A-F]{6}$/i.test(v)),
+});
+
+export type TowerConfig = z.infer<typeof TowerConfig>;
+
+export const PheromoneConfig = z.object({
   // Basic Parameter
-  tau0: number;
-  tauBase: number;
-  tauMin: number;
-  rho: number;
-  alpha: number;
-  beta: number;
-  tauOnDamaged: number;
-  tauOnDead: number;
-  tauOnReached: number;
+  tau0: z.number(),
+  tauBase: z.number(),
+  tauMin: z.number(),
+  rho: z.number(),
+  alpha: z.number(),
+  beta: z.number(),
+  tauOnDamaged: z.number(),
+  tauOnDead: z.number(),
+  tauOnReached: z.number(),
 
   // Modes
-  globalDecayMode: number;
-  onDamagedMode: number;
-  onDeadMode: number;
-  onTooOldMode: number;
-  onReachedMode: number;
-  probabilityMode: number;
-  targetInfluenceMode: number;
-}
+  globalDecayMode: z.number(),
+  onDamagedMode: z.number(),
+  onDeadMode: z.number(),
+  onTooOldMode: z.number(),
+  onReachedMode: z.number(),
+  probabilityMode: z.number(),
+  targetInfluenceMode: z.number(),
+});
 
-export interface GameConfig {
-  initHp: number;
-  initGold: number;
-  barrackCd: number;
-  antAgeLimit: number;
-  towers: TowerConfig[];
-  pheromone: PheromoneConfig;
-}
+export type PheromoneConfig = z.infer<typeof PheromoneConfig>;
+
+export const GameConfig = z.object({
+  initHp: z.number().refine((v) => v >= 0),
+  initGold: z.number().refine((v) => v >= 0),
+  barrackCd: z.number().refine((v) => v >= 0),
+  antAgeLimit: z.number().refine((v) => v >= 0),
+  towers: TowerConfig.array(),
+  pheromone: PheromoneConfig,
+});
+
+export type GameConfig = z.infer<typeof GameConfig>;
 
 export const DefaultConfig: GameConfig = {
   initHp: 100,

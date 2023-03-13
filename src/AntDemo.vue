@@ -4,7 +4,7 @@ import Konva from "konva";
 import { watch } from "vue";
 import { GameData } from "./GameData";
 import * as Coord from "./CoordUtils";
-import { DefaultConfig } from "./GameConfig";
+import { DefaultConfig, GameConfig } from "./GameConfig";
 import { renderConfig, coord2screen, arrayEq } from "./Utils";
 
 /*
@@ -23,18 +23,21 @@ import { renderConfig, coord2screen, arrayEq } from "./Utils";
  *
  * 1. onMounted -> Bind layer & draw background
  * 2. onClicked -> Update game data highlandMask & change color
- * 3. nextStep -> Ant Delta -> Create new ant node / Animate ant / Remove dead nodes
+ * 3. nextStep -> Create new ant node / Animate ant / Remove dead nodes
  */
 
 const editorMode = ref(true);
 
 const round = ref(0);
 const mapLen = ref(10);
-const konva_stage: Ref<Konva.Stage | null> = ref(null);
 
-let bgLayer: Konva.Layer | null;
-let mainLayer: Konva.Layer | null;
-let gameData: GameData | null;
+const animationInterval = ref(500);
+const autoplayInterval = ref(750);
+
+let konvaStage: Konva.Stage | null = null;
+let bgLayer: Konva.Layer | null = null;
+let mainLayer: Konva.Layer | null = null;
+let gameData: GameData | null = null;
 
 function updateCellColor(x: number, y: number, cell: Konva.RegularPolygon) {
   if (gameData) {
@@ -50,19 +53,10 @@ function updateCellColor(x: number, y: number, cell: Konva.RegularPolygon) {
   }
 }
 
-watch([konva_stage, mapLen], ([stage, len]: [Konva.Stage | null, number]) => {
-  if (stage == null) {
-    return;
-  }
-  if (len < 3 || len >= 16) {
-    console.warn(`Invalid map len ${len}`);
-    return;
-  }
+function setupKonvaStage(len: number) {
+  if (konvaStage === null) return;
 
-  gameData = new GameData(len, DefaultConfig);
-
-  stage.destroyChildren();
-
+  if (bgLayer !== null) bgLayer.destroy();
   bgLayer = new Konva.Layer();
   for (let coord of Coord.inDistance(len - 1, len - 1, len - 1)) {
     let [x, y] = coord;
@@ -92,28 +86,52 @@ watch([konva_stage, mapLen], ([stage, len]: [Konva.Stage | null, number]) => {
     updateCellColor(x, y, cell);
     bgLayer.add(cell);
   }
-  stage.add(bgLayer);
+  konvaStage.add(bgLayer);
   bgLayer.draw();
 
+  if (mainLayer !== null) mainLayer.destroy();
   mainLayer = new Konva.Layer();
   mainLayer.listening(false);
-  stage.add(mainLayer);
+  konvaStage.add(mainLayer);
   mainLayer.draw();
+}
+
+watch(mapLen, (len) => {
+  if (len < 3 || len >= 16) {
+    console.warn(`Map length ${len} is out of range`);
+    return;
+  }
+  gameData = new GameData(len, gameData ? gameData.config : DefaultConfig);
+  setupKonvaStage(len);
 });
 
 const vKonvaDiv = {
   mounted: (el: HTMLDivElement) => {
+    // Load config from localStorage
+    const mapLenStr = localStorage.getItem("mapLen");
+    let mapLen = mapLenStr ? parseInt(mapLenStr) : 10;
+    if (isNaN(mapLen) || mapLen < 3 || mapLen >= 16) mapLen = 10;
+
+    const gameConfigStr = localStorage.getItem("gameConfig");
+    let gameConfig = gameConfigStr ? (JSON.parse(gameConfigStr) as GameConfig) : DefaultConfig;
+
+    gameData = new GameData(mapLen, gameConfig);
+
+    // Construct Konva Stage
     const stage = new Konva.Stage({
       container: el,
       width: el.offsetWidth,
       height: el.offsetHeight,
     });
-    konva_stage.value = stage;
+    konvaStage = stage;
+    setupKonvaStage(mapLen);
   },
 };
 
 function finishEditing() {
   editorMode.value = false;
+  localStorage.setItem("mapLen", mapLen.value.toString());
+  localStorage.setItem("highlandMask", gameData ? gameData.exportHighland() : "");
 }
 
 const importDesignShow = ref(false);
@@ -140,7 +158,7 @@ function exportDesign() {
 
 function nextRound() {
   if (gameData) {
-    gameData.nextStep(mainLayer);
+    gameData.nextStep(mainLayer, animationInterval.value);
     round.value = gameData.round;
   }
 }
@@ -152,26 +170,63 @@ function autoPlay() {
     window.clearInterval(autoTimer);
     autoPlaying.value = false;
   } else {
-    autoTimer = window.setInterval(nextRound, 750);
+    autoTimer = window.setInterval(nextRound, autoplayInterval.value);
     autoPlaying.value = true;
   }
+}
+
+const configDialogShow = ref(false);
+const configString = ref("");
+function showConfigDialog() {
+  configDialogShow.value = true;
+  configString.value = JSON.stringify(gameData!.config, null, 2);
+}
+function saveConfig() {
+  try {
+    const config = GameConfig.parse(JSON.parse(configString.value));
+    gameData!.config = config;
+  } catch (e) {
+    console.warn("Cannot parse config string");
+    console.warn(configString);
+  }
+  configDialogShow.value = false;
 }
 </script>
 
 <template>
   <v-layout>
     <v-navigation-drawer width="300">
-      <!-- Editor Mode Card -->
-      <v-card title="Editor Mode" v-if="editorMode">
-        <v-card-text>
-          <v-text-field label="MapLen" type="number" v-model:model-value="mapLen"></v-text-field>
-        </v-card-text>
-        <v-card-actions>
-          <v-btn color="primary" @click="finishEditing">Finish</v-btn>
-          <v-btn color="secondary" @click="importDesignShow = true">Import</v-btn>
-          <v-btn color="secondary" @click="exportDesign">Export</v-btn>
-        </v-card-actions>
-      </v-card>
+      <div v-if="editorMode">
+        <v-card title="Map Editor">
+          <v-card-text>
+            <v-text-field label="MapLen" type="number" v-model:model-value="mapLen"></v-text-field>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn color="primary" @click="finishEditing">Finish</v-btn>
+            <v-btn color="secondary" @click="importDesignShow = true">Import</v-btn>
+            <v-btn color="secondary" @click="exportDesign">Export</v-btn>
+          </v-card-actions>
+        </v-card>
+        <v-card title="Game Configuration">
+          <v-card-text>
+            <v-text-field
+              label="Animation Interval"
+              type="number"
+              v-model:model-value="animationInterval"
+            ></v-text-field>
+            <v-text-field
+              label="Autoplay Interval"
+              type="number"
+              v-model:model-value="autoplayInterval"
+            ></v-text-field>
+          </v-card-text>
+          <v-card-actions>
+            <v-btn color="primary" prepend-icon="mdi-text-box-edit" @click="showConfigDialog">
+              Modify Config
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </div>
 
       <div v-else>
         <v-card>
@@ -182,8 +237,9 @@ function autoPlay() {
               :prepend-icon="autoPlaying ? 'mdi-pause' : 'mdi-play'"
               :color="autoPlaying ? 'warning' : 'success'"
               @click="autoPlay"
-              >AutoPlay</v-btn
             >
+              AutoPlay
+            </v-btn>
           </v-card-actions>
         </v-card>
       </div>
@@ -207,6 +263,17 @@ function autoPlay() {
         </v-card-text>
         <v-card-actions>
           <v-btn color="primary" block @click="exportDesignShow = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="configDialogShow">
+      <v-card title="Config Editor">
+        <v-card-text>
+          <v-textarea auto-grow v-model:model-value="configString"></v-textarea>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn color="primary" block @click="saveConfig">Save Config</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

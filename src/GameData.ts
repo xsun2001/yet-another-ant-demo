@@ -403,7 +403,7 @@ export class GameData {
     return exported;
   }
 
-  nextStep(canvas: Konva.Layer | null = null) {
+  nextStep(canvas: Konva.Layer | null, animationInterval: number) {
     let tweenList: Konva.Tween[] = [];
 
     // 1. Tower attack
@@ -445,7 +445,7 @@ export class GameData {
           tweenList.push(
             new Konva.Tween({
               node: antShape,
-              duration: 0.5,
+              duration: animationInterval / 1000,
               opacity: 0,
               onFinish: () => {
                 antShape.destroy();
@@ -503,7 +503,7 @@ export class GameData {
               node: antShape,
               x: nsx,
               y: nsy,
-              duration: 0.5,
+              duration: animationInterval / 1000,
               onFinish: () => {
                 if (reached) {
                   antShape.destroy();
@@ -540,7 +540,7 @@ export class GameData {
             id: `ANT-${ant.id}`,
           });
           canvas.add(antShape);
-          tweenList.push(new Konva.Tween({ node: antShape, duration: 0.5, opacity: 1 }));
+          tweenList.push(new Konva.Tween({ node: antShape, duration: animationInterval / 1000, opacity: 1 }));
         }
         barrack.cd = this.config.barrackCd;
       }
