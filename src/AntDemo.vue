@@ -48,9 +48,9 @@ let gameData: GameData | null = null;
 function updateCellColor(x: number, y: number, cell: Konva.RegularPolygon) {
   if (gameData) {
     if (arrayEq([x, y], gameData.hqPos[0])) {
-      cell.fill("red");
+      cell.fill(renderConfig.playerColor[0]);
     } else if (arrayEq([x, y], gameData.hqPos[1])) {
-      cell.fill("blue");
+      cell.fill(renderConfig.playerColor[1]);
     } else if (gameData.highlandMask[x][y]) {
       cell.fill("orange");
     } else {
@@ -312,7 +312,7 @@ function updateTower(x: number, y: number, player: number, type: number) {
     mainLayer.add(
       new Konva.Rect({
         id: `TOWER-RECT-${tower.id}`,
-        fill: player === 1 ? "red" : "blue",
+        fill: renderConfig.playerColor[tower.player],
         stroke: "green",
         strokeWidth: 2,
         cornerRadius: 5,
@@ -395,7 +395,7 @@ function updateTower(x: number, y: number, player: number, type: number) {
           </v-card>
 
           <tower-card
-            :key="towerUpdateKey"
+            :key="`${round}-${towerUpdateKey}`"
             :x="selectedPos[0]"
             :y="selectedPos[1]"
             :gameData="gameData"
@@ -404,7 +404,7 @@ function updateTower(x: number, y: number, player: number, type: number) {
 
           <pheromone-card
             v-for="p in 2"
-            :key="p"
+            :key="`${round}-${p}`"
             :x="selectedPos[0]"
             :y="selectedPos[1]"
             :player="p - 1"
@@ -412,7 +412,7 @@ function updateTower(x: number, y: number, player: number, type: number) {
           />
         </template>
 
-        <ant-card v-for="ant in selectedAnts" :key="ant.id" :ant="ant" />
+        <ant-card v-for="ant in selectedAnts" :key="`${round}-${ant.id}`" :ant="ant" />
       </div>
     </v-navigation-drawer>
 

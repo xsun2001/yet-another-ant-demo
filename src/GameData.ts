@@ -53,7 +53,7 @@ function findTargetAnts(tower: Tower, ants: MapLayer<Ant>): Ant[] {
   let x = tower.x,
     y = tower.y;
   let selected = ants.getByRange(x, y, tower.config.range);
-  selected = selected.filter((ant) => ant.hp > 0 && ant.player != tower.player);
+  selected = selected.filter((ant) => ant.hp > 0 && ant.player !== tower.player);
   selected.sort((a, b) => {
     let disA = Coord.distance(a.x, a.y, x, y);
     let disB = Coord.distance(b.x, b.y, x, y);
@@ -63,7 +63,14 @@ function findTargetAnts(tower: Tower, ants: MapLayer<Ant>): Ant[] {
       return disA - disB;
     }
   });
+  console.log(selected);
   return selected;
+}
+
+function damageAndLog(tower: Tower, ant: Ant, damage: number) {
+  const previousHp = ant.hp;
+  ant.hp -= damage;
+  console.log(`Tower ${tower.id} attacks Ant ${ant.id} | HP ${previousHp} -> ${ant.hp}`);
 }
 
 function normal(targetCount: number, attackCount: number): AttackFunc {
@@ -72,7 +79,7 @@ function normal(targetCount: number, attackCount: number): AttackFunc {
     for (let i = 0; i < attackCount; i++) {
       let targets = findTargetAnts(tower, ants);
       for (let j = 0; j < targetCount && j < targets.length; j++) {
-        targets[j].hp -= tower.config.damage;
+        damageAndLog(tower, targets[j], tower.config.damage);
       }
       if (targets.length > 0) {
         attacked = true;
@@ -88,14 +95,21 @@ function ice(): AttackFunc {
     if (targets.length == 0) {
       return false;
     }
-    targets[0].hp -= tower.config.damage;
+    damageAndLog(tower, targets[0], tower.config.damage);
     targets[0].state = AntState.Frozen;
     return true;
   };
 }
 
-function aoeDamageAt(x: number, y: number, range: number, damage: number, ants: MapLayer<Ant>) {
-  ants.getByRange(x, y, range).forEach((ant) => (ant.hp -= damage));
+function aoeDamageAt(
+  tower: Tower,
+  x: number,
+  y: number,
+  range: number,
+  damage: number,
+  ants: MapLayer<Ant>
+) {
+  ants.getByRange(x, y, range).forEach((ant) => damageAndLog(tower, ant, damage));
 }
 
 function aoe(damageRange: number): AttackFunc {
@@ -104,7 +118,7 @@ function aoe(damageRange: number): AttackFunc {
     if (targets.length == 0) {
       return false;
     }
-    aoeDamageAt(targets[0].x, targets[0].y, damageRange, tower.config.damage, ants);
+    aoeDamageAt(tower, targets[0].x, targets[0].y, damageRange, tower.config.damage, ants);
     return true;
   };
 }
@@ -114,7 +128,7 @@ function pulse(): AttackFunc {
     if (findTargetAnts(tower, ants).length == 0) {
       return false;
     }
-    aoeDamageAt(tower.x, tower.y, tower.config.range, tower.config.damage, ants);
+    aoeDamageAt(tower, tower.x, tower.y, tower.config.range, tower.config.damage, ants);
     return true;
   };
 }
@@ -352,8 +366,8 @@ export class GameData {
       };
       if (attackType === "normal") {
         attack = normal(
-          checkOrDefault(conf.attack.attackCount, 1),
-          checkOrDefault(conf.attack.targetCount, 1)
+          checkOrDefault(conf.attack.targetCount, 1),
+          checkOrDefault(conf.attack.attackCount, 1)
         );
       } else if (attackType === "ice") {
         attack = ice();
@@ -449,16 +463,16 @@ export class GameData {
   }
 
   nextStep(canvas: Konva.Layer | null, animationInterval: number) {
+    console.log(`Round: ${this.round}`);
     let tweenList: Konva.Tween[] = [];
 
     // 1. Tower attack
     console.log("Tower attack");
     this.towers.data.forEach((tower) => {
-      console.log(tower);
       if (tower.cd > 0) {
         tower.cd--;
       }
-      if (tower.cd == 0) {
+      if (tower.cd === 0) {
         let attack = this.towerAttack.get(tower.config.type);
         if (attack) {
           if (attack(tower, this.ants)) {
@@ -467,6 +481,8 @@ export class GameData {
         } else {
           console.warn(`Cannot find the attack function of ${tower}`);
         }
+      } else {
+        console.log(`Tower ${tower.id} in cd ${tower.cd}`);
       }
     });
 
@@ -567,6 +583,7 @@ export class GameData {
       }
       if (barrack.cd === 0) {
         let ant = new Ant(this.barracks.useNextIdx(), barrack.player, barrack.x, barrack.y, 10);
+        console.log(`Ant ${ant.id} is spawned at (${ant.x}, ${ant.y})`);
         this.ants.data.push(ant);
         if (canvas) {
           let [sx, sy] = coord2screen(ant.x, ant.y);
@@ -574,7 +591,7 @@ export class GameData {
             x: sx,
             y: sy,
             radius: renderConfig.cellRadius * 0.5,
-            fill: ant.player ? "blue" : "red",
+            fill: renderConfig.playerColor[ant.player],
             stroke: "#ffffff",
             strokeWidth: 2,
             opacity: 0,
@@ -586,6 +603,8 @@ export class GameData {
           );
         }
         barrack.cd = this.config.barrackCd;
+      } else {
+        console.log(`Barrack ${barrack.id} in cd ${barrack.cd}`);
       }
     });
 
@@ -594,5 +613,6 @@ export class GameData {
 
     // 6. Other stuff
     this.round += 1;
+    console.log();
   }
 }

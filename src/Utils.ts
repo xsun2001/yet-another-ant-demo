@@ -36,6 +36,7 @@ export const renderConfig = {
   cellRadius: 20,
   offsetX: 50,
   offsetY: 50,
+  playerColor: ["red", "blue"],
 };
 
 // Coordinate to Screen position
