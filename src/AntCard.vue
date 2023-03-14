@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Ant } from "./GameData";
+import { Ant } from "./Ant";
 
 const props = defineProps<{ ant: Ant }>();
 const ant = props.ant;

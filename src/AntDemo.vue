@@ -2,13 +2,15 @@
 import { ref, Ref } from "@vue/reactivity";
 import Konva from "konva";
 import { watch } from "vue";
-import { Ant, GameData, Pheromone, Tower } from "./GameData";
-import * as Coord from "./CoordUtils";
+import * as Coord from "./Coord";
 import { DefaultConfig, GameConfig } from "./GameConfig";
 import { renderConfig, coord2screen, arrayEq } from "./Utils";
 import PheromoneCard from "./PheromoneCard.vue";
 import TowerCard from "./TowerCard.vue";
 import AntCard from "./AntCard.vue";
+import { Ant } from "./Ant";
+import { GameData } from "./GameData";
+import { Tower } from "./Tower";
 
 /*
  * Editor mode
