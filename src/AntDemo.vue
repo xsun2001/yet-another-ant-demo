@@ -2,10 +2,13 @@
 import { ref, Ref } from "@vue/reactivity";
 import Konva from "konva";
 import { watch } from "vue";
-import { GameData } from "./GameData";
+import { Ant, GameData, Pheromone, Tower } from "./GameData";
 import * as Coord from "./CoordUtils";
 import { DefaultConfig, GameConfig } from "./GameConfig";
 import { renderConfig, coord2screen, arrayEq } from "./Utils";
+import PheromoneCard from "./PheromoneCard.vue";
+import TowerCard from "./TowerCard.vue";
+import AntCard from "./AntCard.vue";
 
 /*
  * Editor mode
@@ -31,8 +34,11 @@ const editorMode = ref(true);
 const round = ref(0);
 const mapLen = ref(10);
 
-const animationInterval = ref(500);
-const autoplayInterval = ref(750);
+const animationInterval = ref(200);
+const autoplayInterval = ref(300);
+
+const selectedPos: Ref<[number, number] | null> = ref(null);
+const selectedAnts: Ref<Ant[]> = ref([]);
 
 let konvaStage: Konva.Stage | null = null;
 let bgLayer: Konva.Layer | null = null;
@@ -52,6 +58,29 @@ function updateCellColor(x: number, y: number, cell: Konva.RegularPolygon) {
     }
   }
 }
+
+function updateSelectedData() {
+  if (selectedPos.value) {
+    const [x, y] = selectedPos.value;
+    selectedAnts.value = gameData?.ants.getByPos(x, y) ?? [];
+  } else {
+    selectedAnts.value = [];
+  }
+}
+
+watch(selectedPos, (coord) => {
+  const border = bgLayer?.findOne("#SELECTED") as Konva.RegularPolygon;
+  if (!border) return;
+  if (coord) {
+    const [sx, sy] = coord2screen(coord[0], coord[1]);
+    border.x(sx);
+    border.y(sy);
+    border.strokeWidth(4);
+  } else {
+    border.strokeWidth(0);
+  }
+  updateSelectedData();
+});
 
 function setupKonvaStage(len: number) {
   if (konvaStage === null) return;
@@ -77,7 +106,17 @@ function setupKonvaStage(len: number) {
           gameData.toggleHighland(x, y);
           updateCellColor(x, y, cell);
         } else {
-          // Show information
+          let selected = true;
+          if (selectedPos.value) {
+            const [sx, sy] = selectedPos.value;
+            if (x === sx && y === sy) {
+              selectedPos.value = null;
+              selected = false;
+            }
+          }
+          if (selected) {
+            selectedPos.value = [x, y];
+          }
         }
       } else {
         console.warn("GameData object is null");
@@ -86,6 +125,18 @@ function setupKonvaStage(len: number) {
     updateCellColor(x, y, cell);
     bgLayer.add(cell);
   }
+  const selectedBorder = new Konva.RegularPolygon({
+    x: 0,
+    y: 0,
+    id: `SELECTED`,
+    sides: 6,
+    radius: renderConfig.cellRadius,
+    stroke: "yellow",
+    strokeWidth: 0,
+    rotation: 90,
+  });
+  selectedBorder.listening(false);
+  bgLayer.add(selectedBorder);
   konvaStage.add(bgLayer);
   bgLayer.draw();
 
@@ -167,6 +218,7 @@ function nextRound() {
   if (gameData) {
     gameData.nextStep(mainLayer, animationInterval.value);
     round.value = gameData.round;
+    updateSelectedData();
   }
 }
 
@@ -198,11 +250,78 @@ function saveConfig() {
   }
   configDialogShow.value = false;
 }
+
+const towerUpdateKey = ref(0);
+function updateTower(x: number, y: number, player: number, type: number) {
+  console.log(`Update tower at (${x}, ${y}) to ${type} for player ${player}`);
+  if (gameData && mainLayer) {
+    const newConfig = gameData.towerConfig(type);
+    if (!newConfig) {
+      console.warn(`Invalid tower type ${type}`);
+      return;
+    }
+
+    let tower = gameData.towers.getByPos(x, y)[0];
+    if (tower) {
+      if (tower.player !== player) {
+        console.warn(`Tower at [${x}, ${y}] is not owned by player ${player}`);
+        return;
+      }
+      if (tower.config.type === type) {
+        console.warn(`Tower at [${x}, ${y}] is already type ${type}`);
+        return;
+      }
+      tower.config = newConfig;
+      tower.cd = 0;
+
+      const towerRect = mainLayer.findOne(`#TOWER-RECT-${tower.id}`) as Konva.Rect;
+      const towerText = mainLayer.findOne(`#TOWER-TEXT-${tower.id}`) as Konva.Text;
+      towerRect?.destroy();
+      towerText?.destroy();
+    } else {
+      tower = new Tower(gameData.towers.useNextIdx(), player, x, y, newConfig);
+      gameData.towers.push(tower);
+    }
+
+    const [sx, sy] = coord2screen(x, y);
+    const shapeConfig: Konva.ShapeConfig = {
+      x: sx,
+      y: sy,
+      width: renderConfig.cellRadius,
+      height: renderConfig.cellRadius,
+      offsetX: renderConfig.cellRadius / 2,
+      offsetY: renderConfig.cellRadius / 2,
+    };
+    mainLayer.add(
+      new Konva.Rect({
+        id: `TOWER-RECT-${tower.id}`,
+        fill: player === 1 ? "red" : "blue",
+        stroke: "green",
+        strokeWidth: 2,
+        cornerRadius: 5,
+        ...shapeConfig,
+      })
+    );
+    mainLayer.add(
+      new Konva.Text({
+        id: `TOWER-TEXT-${tower.id}`,
+        text: type.toString(),
+        fill: "white",
+        align: "center",
+        verticalAlign: "middle",
+        ...shapeConfig,
+      })
+    );
+
+    // Force update tower card
+    ++towerUpdateKey.value;
+  }
+}
 </script>
 
 <template>
   <v-layout>
-    <v-navigation-drawer width="300">
+    <v-navigation-drawer width="370">
       <div v-if="editorMode">
         <v-card title="Map Editor">
           <v-card-text>
@@ -249,6 +368,34 @@ function saveConfig() {
             </v-btn>
           </v-card-actions>
         </v-card>
+
+        <template v-if="gameData && selectedPos">
+          <v-card>
+            <v-card-title>
+              <v-icon icon="mdi-crosshairs-gps"></v-icon>
+              Selected: [{{ selectedPos[0] }}, {{ selectedPos[1] }}]
+            </v-card-title>
+          </v-card>
+
+          <tower-card
+            :key="towerUpdateKey"
+            :x="selectedPos[0]"
+            :y="selectedPos[1]"
+            :gameData="gameData"
+            @update-tower="updateTower"
+          />
+
+          <pheromone-card
+            v-for="p in 2"
+            :key="p"
+            :x="selectedPos[0]"
+            :y="selectedPos[1]"
+            :player="p - 1"
+            :gameData="gameData"
+          />
+        </template>
+
+        <ant-card v-for="ant in selectedAnts" :key="ant.id" :ant="ant" />
       </div>
     </v-navigation-drawer>
 
@@ -296,6 +443,6 @@ function saveConfig() {
 <style scoped>
 .v-navigation-drawer .v-card {
   margin: 10px;
-  width: 280px;
+  width: 350px;
 }
 </style>

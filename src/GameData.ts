@@ -22,6 +22,7 @@ export class Ant {
   x: number;
   y: number;
   hp: number;
+  maxHp: number;
   state: AntState;
   path: [number, number][];
 
@@ -31,6 +32,7 @@ export class Ant {
     this.x = x;
     this.y = y;
     this.hp = hp;
+    this.maxHp = hp;
     this.state = AntState.Alive;
     this.path = [[x, y]];
   }
@@ -161,13 +163,13 @@ export class MapLayer<Data extends IdPosData> {
   getList(): Data[] {
     return this.data;
   }
-  getByPredicate(Predicate: (data: Data) => boolean): Data | undefined {
-    return this.data.find(Predicate);
+  getByPredicate(pred: (data: Data) => boolean): Data[] {
+    return this.data.filter(pred);
   }
-  getById(id: number): Data | undefined {
+  getById(id: number): Data[] {
     return this.getByPredicate((data) => data.id === id);
   }
-  getByPos(x: number, y: number): Data | undefined {
+  getByPos(x: number, y: number): Data[] {
     return this.getByPredicate((data) => data.x === x && data.y === y);
   }
   getByRange(x: number, y: number, range: number): Data[] {
@@ -237,10 +239,9 @@ export class Pheromone {
 
   onTooOld(ant: Ant) {}
 
-  etaTarget(ant: Ant, dir: number, target: [number, number]): number {
+  etaTarget(x: number, y: number, dir: number, target: [number, number]): number {
     if (this.config.targetInfluenceMode === 0) {
       let [tx, ty] = target;
-      let [x, y] = [ant.x, ant.y];
       let [dx, dy] = Coord.neighbor(x, y, dir);
       let distDelta = Coord.distance(tx, ty, dx, dy) - Coord.distance(tx, ty, x, y);
       if (distDelta === 1) {
@@ -251,7 +252,7 @@ export class Pheromone {
         return 2.0;
       } else {
         console.warn(
-          `Invalid distDelta. Target: [${tx}, ${ty}]. Ant: [${x}, ${y}]. Dir: [${dx}, ${dy}]`
+          `Invalid distDelta. Target: [${tx}, ${ty}]. From: [${x}, ${y}]. To: [${dx}, ${dy}]`
         );
         return 0;
       }
@@ -260,15 +261,25 @@ export class Pheromone {
     return 0;
   }
 
-  moveProbability(ant: Ant, highlandMask: boolean[][], target: [number, number]): number[] {
+  moveInformation(
+    x: number,
+    y: number,
+    highlandMask: boolean[][],
+    target: [number, number]
+  ): {
+    valid: boolean[];
+    tau: number[];
+    eta: number[];
+    prob: number[];
+  } {
     let prob = genArray(6, () => 0);
-    let coord = genArray(6, (dir) => Coord.neighbor(ant.x, ant.y, dir));
+    let coord = genArray(6, (dir) => Coord.neighbor(x, y, dir));
     let valid = coord.map(([x, y]) => Coord.isCoordValid(x, y, this.len) && !highlandMask[x][y]);
     let tau = coord.map(([x, y], dir) =>
       valid[dir] ? Math.pow(this.value[x][y], this.config.alpha) : 0
     );
     let eta = valid.map((valid, dir) =>
-      valid ? Math.pow(this.etaTarget(ant, dir, target), this.config.beta) : 0
+      valid ? Math.pow(this.etaTarget(x, y, dir, target), this.config.beta) : 0
     );
 
     if (this.config.probabilityMode === 0) {
@@ -284,10 +295,24 @@ export class Pheromone {
     if (sum > 0) {
       prob = prob.map((v) => v / sum);
     } else {
-      console.log(`Probability of all direction is equal to zero. ${ant.id}`);
+      console.log(`Probability of all direction of [${x}, ${y}] is equal to zero.`);
     }
 
-    return prob;
+    return {
+      valid,
+      tau,
+      eta,
+      prob,
+    };
+  }
+
+  moveProbability(
+    x: number,
+    y: number,
+    highlandMask: boolean[][],
+    target: [number, number]
+  ): number[] {
+    return this.moveInformation(x, y, highlandMask, target).prob;
   }
 }
 
@@ -339,7 +364,7 @@ export class GameData {
       } else {
         console.warn(`Unknown attack mode ${conf.attack}`);
       }
-      this.towerAttack.set(conf.id, attack);
+      this.towerAttack.set(conf.type, attack);
     });
 
     // TODO: Make HQ position configurable
@@ -403,6 +428,26 @@ export class GameData {
     return exported;
   }
 
+  towerConfig(typeId: number): TowerConfig | undefined {
+    return this.config.towers.find((tower) => tower.type === typeId);
+  }
+
+  nextLevelTower(typeId: number): [number, string][] {
+    return this.config.towers
+      .filter((tower) => tower.baseType === typeId)
+      .map((tower) => [tower.type, tower.name]);
+  }
+
+  previousLevelTower(typeId: number): [number, string] {
+    const config = this.towerConfig(typeId);
+    const base = this.towerConfig(config?.baseType ?? -1);
+    return base ? [base.type, base.name] : [-1, ""];
+  }
+
+  moveInformation(x: number, y: number, player: number) {
+    return this.pheromone[player].moveInformation(x, y, this.highlandMask, this.hqPos[1 - player]);
+  }
+
   nextStep(canvas: Konva.Layer | null, animationInterval: number) {
     let tweenList: Konva.Tween[] = [];
 
@@ -414,7 +459,7 @@ export class GameData {
         tower.cd--;
       }
       if (tower.cd == 0) {
-        let attack = this.towerAttack.get(tower.config.id);
+        let attack = this.towerAttack.get(tower.config.type);
         if (attack) {
           if (attack(tower, this.ants)) {
             tower.cd = tower.config.interval;
@@ -472,11 +517,7 @@ export class GameData {
       }
 
       // Pheromone move
-      let prob = this.pheromone[ant.player].moveProbability(
-        ant,
-        this.highlandMask,
-        this.hqPos[1 - ant.player]
-      );
+      let prob = this.moveInformation(ant.x, ant.y, ant.player).prob;
       if (prob.reduce((allZero, cur) => allZero && cur == 0, true)) {
         console.warn(`Ant ${ant.id} is stuck`);
         return;
