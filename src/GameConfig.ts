@@ -1,6 +1,18 @@
 import { evaluate } from "mathjs";
 import { z } from "zod";
 
+// https://mathjs.org/docs/expressions/syntax.html
+function isFunctionOf(...vars: string[]): (expr: string) => boolean {
+  return (expr) => {
+    try {
+      evaluate(expr, Object.fromEntries(vars.map((v) => [v, 0])));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+}
+
 export const TowerConfig = z.object({
   type: z.number().refine((v) => v >= 0),
   name: z.string(),
@@ -26,9 +38,10 @@ export const PheromoneConfig = z.object({
   rho: z.number(),
   alpha: z.number(),
   beta: z.number(),
-  tauOnDamaged: z.number(),
-  tauOnDead: z.number(),
-  tauOnReached: z.number(),
+  tauOnDamaged: z.string().refine(isFunctionOf("age", "damage", "maxhp")),
+  tauOnDead: z.string().refine(isFunctionOf("age", "maxhp")),
+  tauOnReached: z.string().refine(isFunctionOf("age", "hp", "maxhp")),
+  tauOnTooOld: z.string().refine(isFunctionOf("age", "hp", "maxhp")),
 
   // Modes
   globalDecayMode: z.number(),
@@ -45,14 +58,7 @@ export type PheromoneConfig = z.infer<typeof PheromoneConfig>;
 export const GameConfig = z.object({
   initHp: z.number().refine((v) => v >= 0),
   initGold: z.number().refine((v) => v >= 0),
-  antHp: z.string().refine((expr) => {
-    try {
-      evaluate(expr, { r: 0 });
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }, "Invalid ant hp expression"),
+  antHp: z.string().refine(isFunctionOf("r")),
   barrackCd: z.number().refine((v) => v >= 0),
   antAgeLimit: z.number().refine((v) => v >= 0),
   towers: TowerConfig.array(),
@@ -64,7 +70,7 @@ export type GameConfig = z.infer<typeof GameConfig>;
 export const DefaultConfig: GameConfig = {
   initHp: 100,
   initGold: 50,
-  antHp: "10 * 1.005 ^ r",
+  antHp: "10 * 1.005 ^ r", // f(r)
   barrackCd: 2,
   antAgeLimit: 64,
   // prettier-ignore
@@ -87,12 +93,13 @@ export const DefaultConfig: GameConfig = {
     tau0: 10,
     tauBase: 10,
     tauMin: 0.01,
-    rho: 0.9,
+    rho: 0.96,
     alpha: 1,
     beta: 1,
-    tauOnDamaged: -3,
-    tauOnDead: -5,
-    tauOnReached: 10,
+    tauOnDamaged: "-3", // f(age, damage, maxhp)
+    tauOnDead: "-5", // f(age, maxhp)
+    tauOnReached: "10", // f(age, hp, maxhp)
+    tauOnTooOld: "-3", // f(age, hp, maxhp)
 
     globalDecayMode: 0,
     onDamagedMode: 0,

@@ -48,7 +48,7 @@ export class Ant {
   }
 }
 
-type AttackFunc = (tower: Tower, ants: MapLayer<Ant>) => boolean;
+type AttackFunc = (tower: Tower, ants: MapLayer<Ant>) => [Ant, number][];
 
 function findTargetAnts(tower: Tower, ants: MapLayer<Ant>): Ant[] {
   let x = tower.x,
@@ -76,14 +76,12 @@ function damageAndLog(tower: Tower, ant: Ant, damage: number) {
 
 function normal(targetCount: number, attackCount: number): AttackFunc {
   return (tower, ants) => {
-    let attacked = false;
+    let attacked: [Ant, number][] = [];
     for (let i = 0; i < attackCount; i++) {
       let targets = findTargetAnts(tower, ants);
       for (let j = 0; j < targetCount && j < targets.length; j++) {
         damageAndLog(tower, targets[j], tower.config.damage);
-      }
-      if (targets.length > 0) {
-        attacked = true;
+        attacked.push([targets[j], tower.config.damage]);
       }
     }
     return attacked;
@@ -94,11 +92,11 @@ function ice(): AttackFunc {
   return (tower, ants) => {
     let targets = findTargetAnts(tower, ants);
     if (targets.length == 0) {
-      return false;
+      return [];
     }
     damageAndLog(tower, targets[0], tower.config.damage);
     targets[0].state = AntState.Frozen;
-    return true;
+    return [[targets[0], tower.config.damage]];
   };
 }
 
@@ -109,28 +107,29 @@ function aoeDamageAt(
   range: number,
   damage: number,
   ants: MapLayer<Ant>
-) {
-  ants.getByRange(x, y, range).forEach((ant) => damageAndLog(tower, ant, damage));
+): [Ant, number][] {
+  return ants.getByRange(x, y, range).map((ant) => {
+    damageAndLog(tower, ant, damage);
+    return [ant, damage];
+  });
 }
 
 function aoe(damageRange: number): AttackFunc {
   return (tower, ants) => {
     let targets = findTargetAnts(tower, ants);
     if (targets.length == 0) {
-      return false;
+      return [];
     }
-    aoeDamageAt(tower, targets[0].x, targets[0].y, damageRange, tower.config.damage, ants);
-    return true;
+    return aoeDamageAt(tower, targets[0].x, targets[0].y, damageRange, tower.config.damage, ants);
   };
 }
 
 function pulse(): AttackFunc {
   return (tower, ants) => {
     if (findTargetAnts(tower, ants).length == 0) {
-      return false;
+      return [];
     }
-    aoeDamageAt(tower, tower.x, tower.y, tower.config.range, tower.config.damage, ants);
-    return true;
+    return aoeDamageAt(tower, tower.x, tower.y, tower.config.range, tower.config.damage, ants);
   };
 }
 
@@ -216,8 +215,8 @@ export class Pheromone {
     this.value[x][y] = Math.max(this.config.tauMin, this.value[x][y] + delta);
   }
 
-  roundModify(center: [number, number], delta: number[]) {
-    this.pathModify([center], delta);
+  roundModify(center: [number, number], delta: number, lambda: number[] = [1]) {
+    this.pathModify([center], delta, lambda);
   }
 
   pathModifyRadius(path: [number, number][], delta: number, radius: number, mask: boolean[][]) {
@@ -233,26 +232,75 @@ export class Pheromone {
     }
   }
 
-  pathModify(path: [number, number][], delta: number[]) {
-    let mask = Array(this.len).map(() => Array(this.len).fill(false));
-    for (let r = 0; r < delta.length; r++) {
-      this.pathModifyRadius(path, delta[r], r, mask);
+  pathModify(path: [number, number][], delta: number, lambda: number[] = [1]) {
+    let mask = twodimArray(2 * this.len - 1, () => false);
+    for (let r = 0; r < lambda.length; r++) {
+      this.pathModifyRadius(path, delta * lambda[r], r, mask);
     }
   }
 
   globalDecay() {
     const base = this.config.tauBase;
     const rho = this.config.rho;
-    this.value.forEach((row) => row.map((val) => rho * base + (1 - rho) * val));
+    for (let i = 0; i < 2 * this.len - 1; i++) {
+      for (let j = 0; j < 2 * this.len - 1; j++) {
+        this.value[i][j] = rho * this.value[i][j] + (1 - rho) * base;
+      }
+    }
   }
 
-  onDamaged(ant: Ant) {}
+  onRoundBegin() {
+    if (this.config.globalDecayMode === 0) {
+      this.globalDecay();
+    }
+  }
 
-  onDead(ant: Ant) {}
+  onDamaged(ant: Ant, damage: number) {
+    const deltaTau = evaluate(this.config.tauOnDamaged, {
+      damage,
+      age: ant.path.length,
+      maxhp: ant.maxHp,
+    });
+    if (this.config.onDamagedMode === 0) {
+    } else {
+      console.warn(`Unknown onDamagedMode: ${this.config.onDamagedMode}`);
+    }
+  }
 
-  onReached(ant: Ant) {}
+  onDead(ant: Ant) {
+    const deltaTau = evaluate(this.config.tauOnDead, { age: ant.path.length, maxhp: ant.maxHp });
+    if (this.config.onDeadMode === 0) {
+      this.roundModify([ant.x, ant.y], deltaTau, [1, 0.5]);
+    } else {
+      console.warn(`Unknown onDeadMode: ${this.config.onDeadMode}`);
+    }
+  }
 
-  onTooOld(ant: Ant) {}
+  onReached(ant: Ant) {
+    const deltaTau = evaluate(this.config.tauOnReached, {
+      age: ant.path.length,
+      hp: ant.hp,
+      maxhp: ant.maxHp,
+    });
+    if (this.config.onReachedMode === 0) {
+      this.pathModify(ant.path, deltaTau, [1, 0.5]);
+    } else {
+      console.warn(`Unknown onReachedMode: ${this.config.onReachedMode}`);
+    }
+  }
+
+  onTooOld(ant: Ant) {
+    const deltaTau = evaluate(this.config.tauOnTooOld, {
+      age: ant.path.length,
+      hp: ant.hp,
+      maxhp: ant.maxHp,
+    });
+    if (this.config.onTooOldMode === 0) {
+      this.pathModify(ant.path, deltaTau, [1, 0.5]);
+    } else {
+      console.warn(`Unknown onTooOldMode: ${this.config.onTooOldMode}`);
+    }
+  }
 
   etaTarget(x: number, y: number, dir: number, target: [number, number]): number {
     if (this.config.targetInfluenceMode === 0) {
@@ -347,11 +395,11 @@ export class GameData {
   hqHp: [number, number];
   hqPos: [number, number][] = [];
 
-  constructor(len: number, config: GameConfig) {
+  constructor(len: number, config: GameConfig, highland?: boolean[][]) {
     this.len = len;
     this.gold = [config.initGold, config.initGold];
     this.hqHp = [config.initHp, config.initHp];
-    this.highlandMask = twodimArray(2 * len - 1, () => false);
+    this.highlandMask = highland ?? twodimArray(2 * len - 1, () => false);
     this.pheromone = [new Pheromone(len, config.pheromone), new Pheromone(len, config.pheromone)];
     this.config = config;
 
@@ -363,7 +411,7 @@ export class GameData {
       let attackType = conf.attack.type;
       let attack: AttackFunc = () => {
         console.warn(`Unknown attack mode ${conf.attack}`);
-        return false;
+        return [];
       };
       if (attackType === "normal") {
         attack = normal(
@@ -467,6 +515,8 @@ export class GameData {
     console.log(`Round: ${this.round}`);
     let tweenList: Konva.Tween[] = [];
 
+    this.pheromone.forEach((p) => p.onRoundBegin());
+
     // 1. Tower attack
     console.log("Tower attack");
     this.towers.data.forEach((tower) => {
@@ -476,8 +526,12 @@ export class GameData {
       if (tower.cd === 0) {
         let attack = this.towerAttack.get(tower.config.type);
         if (attack) {
-          if (attack(tower, this.ants)) {
+          const attacked = attack(tower, this.ants);
+          if (attacked.length > 0) {
             tower.cd = tower.config.interval;
+            attacked.forEach(([ant, damage]) => {
+              this.pheromone[ant.player].onDamaged(ant, damage);
+            });
           }
         } else {
           console.warn(`Cannot find the attack function of ${tower}`);
@@ -547,7 +601,7 @@ export class GameData {
       if (reached) {
         this.hqHp[1 - ant.player] -= 1;
         console.log(`HQ of player ${1 - ant.player} is attacked by ${ant.id}`);
-        this.pheromone[ant.player].onDead(ant);
+        this.pheromone[ant.player].onReached(ant);
         reachedAnts.push(ant.id);
       }
 
@@ -610,10 +664,8 @@ export class GameData {
       }
     });
 
-    // 5. Fire all animations
+    // 5. Other stuff
     tweenList.forEach((tween) => tween.play());
-
-    // 6. Other stuff
     this.round += 1;
     console.log();
   }

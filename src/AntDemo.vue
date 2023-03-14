@@ -152,7 +152,11 @@ watch(mapLen, (len) => {
     console.warn(`Map length ${len} is out of range`);
     return;
   }
-  gameData = new GameData(len, gameData ? gameData.config : DefaultConfig);
+  gameData = new GameData(
+    len,
+    gameData ? gameData.config : DefaultConfig,
+    len === gameData?.len ? gameData?.highlandMask : undefined
+  );
   setupKonvaStage(len);
 });
 
@@ -160,8 +164,9 @@ const vKonvaDiv = {
   mounted: (el: HTMLDivElement) => {
     // Load config from localStorage
     const mapLenStr = localStorage.getItem("mapLen");
-    let mapLen = mapLenStr ? parseInt(mapLenStr) : 10;
-    if (isNaN(mapLen) || mapLen < 3 || mapLen >= 16) mapLen = 10;
+    let len = mapLenStr ? parseInt(mapLenStr) : 10;
+    if (isNaN(len) || len < 3 || len >= 16) len = 10;
+    mapLen.value = len;
 
     const gameConfigStr = localStorage.getItem("gameConfig");
     let gameConfig = DefaultConfig;
@@ -171,7 +176,7 @@ const vKonvaDiv = {
       console.warn("Failed to parse game config from localStorage", e);
     }
 
-    gameData = new GameData(mapLen, gameConfig);
+    gameData = new GameData(len, gameConfig);
     const highlandMaskStr = localStorage.getItem("highlandMask");
     if (highlandMaskStr) gameData.importHighland(highlandMaskStr);
 
@@ -182,14 +187,15 @@ const vKonvaDiv = {
       height: el.offsetHeight,
     });
     konvaStage = stage;
-    setupKonvaStage(mapLen);
+    setupKonvaStage(len);
   },
 };
 
 function finishEditing() {
   editorMode.value = false;
   localStorage.setItem("mapLen", mapLen.value.toString());
-  localStorage.setItem("highlandMask", gameData ? gameData.exportHighland() : "");
+  localStorage.setItem("highlandMask", gameData?.exportHighland() ?? "");
+  localStorage.setItem("gameConfig", JSON.stringify(gameData?.config));
 }
 
 const importDesignShow = ref(false);
@@ -392,6 +398,14 @@ function updateTower(x: number, y: number, player: number, type: number) {
               <v-icon icon="mdi-crosshairs-gps"></v-icon>
               Selected: [{{ selectedPos[0] }}, {{ selectedPos[1] }}]
             </v-card-title>
+            <v-card-text>
+              <p v-for="p in 2">
+                P{{ p - 1 }} Pheromone:
+                <code>{{
+                  gameData.pheromone[p - 1].value[selectedPos[0]][selectedPos[1]].toFixed(4)
+                }}</code>
+              </p>
+            </v-card-text>
           </v-card>
 
           <tower-card
