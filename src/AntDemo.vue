@@ -252,8 +252,25 @@ function saveConfig() {
 }
 
 const towerUpdateKey = ref(0);
+function deconstructTowerOnly(x: number, y: number) {
+  if (gameData && mainLayer) {
+    let tower = gameData.towers.getByPos(x, y)[0];
+    if (tower) {
+      gameData.towers.data = gameData.towers.data.filter((t) => t.id !== tower.id);
+      const towerRect = mainLayer.findOne(`#TOWER-RECT-${tower.id}`) as Konva.Rect;
+      const towerText = mainLayer.findOne(`#TOWER-TEXT-${tower.id}`) as Konva.Text;
+      towerRect?.destroy();
+      towerText?.destroy();
+      ++towerUpdateKey.value;
+    }
+  }
+}
 function updateTower(x: number, y: number, player: number, type: number) {
   console.log(`Update tower at (${x}, ${y}) to ${type} for player ${player}`);
+  if (type === -1) {
+    deconstructTowerOnly(x, y);
+    return;
+  }
   if (gameData && mainLayer) {
     const newConfig = gameData.towerConfig(type);
     if (!newConfig) {

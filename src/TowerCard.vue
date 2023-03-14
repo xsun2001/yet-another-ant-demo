@@ -56,7 +56,7 @@ function updateTower(player: number, type: number) {
         <p>ATK Type: {{ attackType }}</p>
         <v-btn
           block
-          prepend-icon="mdi-arrow-up-bold-hexagon-outline"
+          prepend-icon="mdi-chevron-up"
           v-for="[id, name] in nextLevel"
           :key="id"
           @click="updateTower(tower.player, id)"
@@ -65,11 +65,10 @@ function updateTower(player: number, type: number) {
         </v-btn>
         <v-btn
           block
-          prepend-icon="mdi-arrow-down-bold-hexagon-outline"
-          v-if="previousLevel[0] !== -1"
+          prepend-icon="mdi-chevron-down"
           @click="updateTower(tower.player, previousLevel[0])"
         >
-          Downgrade to [{{ previousLevel[1] }}]
+          {{ previousLevel[0] === -1 ? "Deconstruct" : `Downgrade to ${previousLevel[1]}` }}
         </v-btn>
       </template>
       <template v-else-if="isHighland">
