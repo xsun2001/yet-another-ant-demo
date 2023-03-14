@@ -1,4 +1,5 @@
 import Konva from "konva";
+import { evaluate } from "mathjs";
 import * as Coord from "./CoordUtils";
 import { GameConfig, PheromoneConfig, TowerConfig } from "./GameConfig";
 import {
@@ -582,7 +583,8 @@ export class GameData {
         barrack.cd--;
       }
       if (barrack.cd === 0) {
-        let ant = new Ant(this.barracks.useNextIdx(), barrack.player, barrack.x, barrack.y, 10);
+        const antHp = Math.floor(evaluate(this.config.antHp, { r: this.round }));
+        let ant = new Ant(this.barracks.useNextIdx(), barrack.player, barrack.x, barrack.y, antHp);
         console.log(`Ant ${ant.id} is spawned at (${ant.x}, ${ant.y})`);
         this.ants.data.push(ant);
         if (canvas) {

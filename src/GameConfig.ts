@@ -1,3 +1,4 @@
+import { evaluate } from "mathjs";
 import { z } from "zod";
 
 export const TowerConfig = z.object({
@@ -12,7 +13,7 @@ export const TowerConfig = z.object({
     targetCount: z.number().optional(),
     aoeRange: z.number().optional(),
   }),
-  baseType: z.number().refine((v) => v >= 0),
+  baseType: z.number(),
 });
 
 export type TowerConfig = z.infer<typeof TowerConfig>;
@@ -44,6 +45,14 @@ export type PheromoneConfig = z.infer<typeof PheromoneConfig>;
 export const GameConfig = z.object({
   initHp: z.number().refine((v) => v >= 0),
   initGold: z.number().refine((v) => v >= 0),
+  antHp: z.string().refine((expr) => {
+    try {
+      evaluate(expr, { r: 0 });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }, "Invalid ant hp expression"),
   barrackCd: z.number().refine((v) => v >= 0),
   antAgeLimit: z.number().refine((v) => v >= 0),
   towers: TowerConfig.array(),
@@ -55,6 +64,7 @@ export type GameConfig = z.infer<typeof GameConfig>;
 export const DefaultConfig: GameConfig = {
   initHp: 100,
   initGold: 50,
+  antHp: "10 * 1.005 ^ r",
   barrackCd: 2,
   antAgeLimit: 64,
   // prettier-ignore
