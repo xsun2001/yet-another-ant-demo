@@ -1,18 +1,22 @@
-# Vue 3 + TypeScript + Vite
+# Yet Another Ant Demo
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+[![wakatime](https://wakatime.com/badge/user/32f2459a-443e-490a-80df-5004794d097c/project/c2a3e27d-76c2-4d75-9439-0a84effb77c4.svg)](https://wakatime.com/badge/user/32f2459a-443e-490a-80df-5004794d097c/project/c2a3e27d-76c2-4d75-9439-0a84effb77c4)
 
-## Recommended IDE Setup
+## Features
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
+1. 地图编辑器，可以更改地图大小，可以通过点击改变地形
+2. 全配置可调节，包括：大本营血量、初始金币、蚂蚁血量曲线、蚂蚁年龄上限、兵营CD、防御塔全配置、信息素算法策略与各个参数。
+3. 蚂蚁血量、信息素改变值等配置可以直接输入函数表达式，函数可用的参数列表参见代码注释
+4. 编辑好的地图可以轻松导入、导出，地图数据可以持久化，点击Finish后刷新页面不改变
+5. 可以自动播放，可以调节动画间隔与自动播放间隔
+6. 地图可点击，可以显示当前位置坐标、信息素、防御塔信息、存在的各个蚂蚁的信息、信息素与计算出的概率等数据
+7. 可以建造、升级、降级、拆除防御塔
+8. 控制台输出详细的运行信息
+9. 全TypeScript，代码结构清晰，易于维护，易于扩展。内部实现了各类帮助函数来执行坐标操作、信息素更新、防御塔攻击等行为
 
-## Type Support For `.vue` Imports in TS
+## TODO List
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
-
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
-
-1. Disable the built-in TypeScript Extension
-   1. Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-   2. Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
+1. 无道具
+2. 无金币系统（测试寻路算法不需要金币，我们可以自己控制防御塔建造）
+3. 无回放
+4. 更细节的可视化，如高亮蚂蚁路径，高亮防御塔范围，信息素视图等
