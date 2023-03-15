@@ -76,6 +76,11 @@ export class Pheromone {
     const deltaTau = evaluate(this.config.tauOnDead, { age: ant.path.length, maxhp: ant.maxHp });
     if (this.config.onDeadMode === 0) {
       this.roundModify([ant.x, ant.y], deltaTau, [1, 0.5]);
+    } else if (this.config.onDeadMode === 1) {
+      this.pathModify(ant.path, deltaTau, [1]);
+    } else if (this.config.onDeadMode === 2) {
+      this.roundModify([ant.x, ant.y], deltaTau, [1, 0.5]);
+      this.pathModify(ant.path, deltaTau, [0.3]);
     } else {
       console.warn(`Unknown onDeadMode: ${this.config.onDeadMode}`);
     }
@@ -88,6 +93,8 @@ export class Pheromone {
       maxhp: ant.maxHp,
     });
     if (this.config.onReachedMode === 0) {
+      this.roundModify([ant.x, ant.y], deltaTau, [1, 0.5]);
+    } else if (this.config.onReachedMode === 1) {
       this.pathModify(ant.path, deltaTau, [1, 0.5]);
     } else {
       console.warn(`Unknown onReachedMode: ${this.config.onReachedMode}`);
@@ -101,6 +108,8 @@ export class Pheromone {
       maxhp: ant.maxHp,
     });
     if (this.config.onTooOldMode === 0) {
+      this.roundModify([ant.x, ant.y], deltaTau, [1, 0.5]);
+    } else if (this.config.onTooOldMode === 1) {
       this.pathModify(ant.path, deltaTau, [1, 0.5]);
     } else {
       console.warn(`Unknown onTooOldMode: ${this.config.onTooOldMode}`);
@@ -117,7 +126,7 @@ export class Pheromone {
       } else if (distDelta === 0) {
         return 1.0;
       } else if (distDelta === -1) {
-        return 2.0;
+        return 1.25;
       } else {
         console.warn(
           `Invalid distDelta. Target: [${tx}, ${ty}]. From: [${x}, ${y}]. To: [${dx}, ${dy}]`
@@ -133,7 +142,8 @@ export class Pheromone {
     x: number,
     y: number,
     highlandMask: boolean[][],
-    target: [number, number]
+    target: [number, number],
+    lastPos: [number, number] = [-1, -1]
   ): {
     valid: boolean[];
     tau: number[];
@@ -142,7 +152,12 @@ export class Pheromone {
   } {
     let prob = genArray(6, () => 0);
     let coord = genArray(6, (dir) => Coord.neighbor(x, y, dir));
-    let valid = coord.map(([x, y]) => Coord.isCoordValid(x, y, this.len) && !highlandMask[x][y]);
+    let valid = coord.map(
+      ([x, y]) =>
+        Coord.isCoordValid(x, y, this.len) &&
+        !highlandMask[x][y] &&
+        !(x === lastPos[0] && y === lastPos[1])
+    );
     let tau = coord.map(([x, y], dir) =>
       valid[dir] ? Math.pow(this.value[x][y], this.config.alpha) : 0
     );
@@ -156,7 +171,10 @@ export class Pheromone {
       prob = valid.map((valid, dir) => (valid ? Math.exp(tau[dir] * eta[dir]) : 0));
     } else if (this.config.probabilityMode === 2) {
       prob = valid.map((valid, dir) => (valid ? Math.exp(tau[dir]) * eta[dir] : 0));
-    } else {
+    } else if (this.config.probabilityMode === 3) {
+      prob = valid.map((valid, dir) => (valid ? tau[dir] * eta[dir] : 0));
+      const maxIdx = prob.indexOf(Math.max(...prob));
+      prob = prob.map((v, i) => (i === maxIdx ? 1 : 0));
     }
 
     let sum = prob.reduce((a, b) => a + b);
@@ -172,14 +190,5 @@ export class Pheromone {
       eta,
       prob,
     };
-  }
-
-  moveProbability(
-    x: number,
-    y: number,
-    highlandMask: boolean[][],
-    target: [number, number]
-  ): number[] {
-    return this.moveInformation(x, y, highlandMask, target).prob;
   }
 }

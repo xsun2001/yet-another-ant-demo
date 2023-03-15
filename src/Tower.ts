@@ -62,10 +62,13 @@ function aoeDamageAt(
   damage: number,
   ants: MapLayer<Ant>
 ): [Ant, number][] {
-  return ants.getByRange(x, y, range).map((ant) => {
-    damageAndLog(tower, ant, damage);
-    return [ant, damage];
-  });
+  return ants
+    .getByRange(x, y, range)
+    .filter((ant) => ant.hp > 0 && ant.player !== tower.player)
+    .map((ant) => {
+      damageAndLog(tower, ant, damage);
+      return [ant, damage];
+    });
 }
 
 export function aoe(damageRange: number): AttackFunc {

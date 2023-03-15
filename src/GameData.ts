@@ -141,6 +141,16 @@ export class GameData {
     return this.pheromone[player].moveInformation(x, y, this.highlandMask, this.hqPos[1 - player]);
   }
 
+  antMove(ant: Ant) {
+    return this.pheromone[ant.player].moveInformation(
+      ant.x,
+      ant.y,
+      this.highlandMask,
+      this.hqPos[1 - ant.player],
+      ant.path.length > 1 ? ant.path[ant.path.length - 2] : undefined
+    );
+  }
+
   nextStep(canvas: Konva.Layer | null, animationInterval: number) {
     console.log(`Round: ${this.round}`);
     let tweenList: Konva.Tween[] = [];
@@ -218,7 +228,7 @@ export class GameData {
       }
 
       // Pheromone move
-      let prob = this.moveInformation(ant.x, ant.y, ant.player).prob;
+      let prob = this.antMove(ant).prob;
       if (prob.reduce((allZero, cur) => allZero && cur == 0, true)) {
         console.warn(`Ant ${ant.id} is stuck`);
         return;
