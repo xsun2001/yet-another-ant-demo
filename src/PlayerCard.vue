@@ -10,15 +10,17 @@ const props = defineProps<{
 const upgradeIcon = ["mdi-speedometer", "mdi-heart-plus"];
 const upgradeName = ["Ant CD", "Ant HP"];
 
+function lvArray(type: number) {
+  return type === 0 ? props.gameData.antCdLv : props.gameData.antHpLv;
+}
+
 function neededGold(type: number) {
-  return ConfigHandler.config.lvUpCost[
-    (type === 0 ? props.gameData.antCdLv : props.gameData.antHpLv)[props.player]
-  ];
+  return ConfigHandler.config.lvUpCost[lvArray(type)[props.player]];
 }
 
 function upgrade(type: number) {
   props.gameData.gold[props.player] -= neededGold(type);
-  (type === 0 ? props.gameData.antCdLv : props.gameData.antHpLv)[props.player]++;
+  lvArray(type)[props.player]++;
 }
 </script>
 
@@ -33,16 +35,18 @@ function upgrade(type: number) {
       <p>Gold: {{ gameData.gold[player] }}</p>
       <p>Ant CD LV: {{ gameData.antCdLv[player] }}</p>
       <p>Ant HP LV: {{ gameData.antHpLv[player] }}</p>
-      <v-btn
-        block
-        v-for="i in 2"
-        :disabled="neededGold(i - 1) > gameData.gold[player]"
-        :prepend-icon="upgradeIcon[i - 1]"
-        @click="upgrade(i - 1)"
-      >
-        Upgrade {{ upgradeName[i - 1] }}
-        {{ neededGold(i - 1) > gameData.gold[player] ? `Need ${neededGold(i - 1)}G` : "" }}
-      </v-btn>
+      <template v-for="i in 2">
+        <v-btn
+          block
+          v-if="lvArray(i - 1)[props.player] < 2"
+          :disabled="neededGold(i - 1) > gameData.gold[player]"
+          :prepend-icon="upgradeIcon[i - 1]"
+          @click="upgrade(i - 1)"
+        >
+          Upgrade {{ upgradeName[i - 1] }}
+          {{ neededGold(i - 1) > gameData.gold[player] ? `Need ${neededGold(i - 1)}G` : "" }}
+        </v-btn>
+      </template>
     </v-card-text>
   </v-card>
 </template>
