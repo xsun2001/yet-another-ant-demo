@@ -16,21 +16,6 @@ export function arrayEq<T>(a1: T[], a2: T[]): boolean {
   return true;
 }
 
-export function probabilityChoose(prob: number[]): number {
-  if (Math.abs(prob.reduce((a, b) => a + b, 0) - 1) > 1e-6) {
-    console.warn(`Invalid probability array: ${prob}`);
-    return 0;
-  }
-  let rd = Math.random();
-  for (let i = 0; i < prob.length; i++) {
-    rd -= prob[i];
-    if (rd < 0) {
-      return i;
-    }
-  }
-  return prob.length - 1;
-}
-
 export const renderConfig = {
   cellRadius: 20,
   offsetX: 110,

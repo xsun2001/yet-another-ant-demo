@@ -1,3 +1,4 @@
+import { ConfigHandler } from "./GameConfig";
 import * as Coord from "./Coord";
 
 export enum AntState {
@@ -11,19 +12,22 @@ export class Ant {
   player: number;
   x: number;
   y: number;
+  lv: number;
   hp: number;
   maxHp: number;
   state: AntState;
+  shield: number;
   path: [number, number][];
 
-  constructor(id: number, player: number, x: number, y: number, hp: number) {
+  constructor(id: number, player: number, x: number, y: number, lv: number) {
     this.id = id;
     this.player = player;
     this.x = x;
     this.y = y;
-    this.hp = hp;
-    this.maxHp = hp;
+    this.lv = lv;
+    this.maxHp = this.hp = ConfigHandler.config.antHpLv[lv];
     this.state = AntState.Alive;
+    this.shield = 0;
     this.path = [[x, y]];
   }
 

@@ -1,11 +1,25 @@
 import Konva from "konva";
 import { Ant, AntState } from "./Ant";
-import { GameConfig } from "./GameConfig";
+import { inDistance } from "./Coord";
+import { ConfigHandler, GameConfig } from "./GameConfig";
 import { MapLayer } from "./MapLayer";
 import { Pheromone } from "./Pheromone";
 import { Tower } from "./Tower";
-import { arrayEq, coord2screen, probabilityChoose, renderConfig } from "./Utils";
+import { arrayEq, coord2screen, genArray, renderConfig, twodimArray } from "./Utils";
 
+export enum SuperWeaponType {
+  LightningStorm = 0,
+  EMPBlast = 1,
+  Deflectors = 2,
+  EmergencyEvasion = 3,
+}
+
+export interface ActiveDeflector {
+  x: number;
+  y: number;
+  player: number;
+  remain: number;
+}
 export class GameData {
   len: number = 0;
   config: GameConfig;
@@ -13,6 +27,7 @@ export class GameData {
   pheromone: [Pheromone, Pheromone];
   ants: MapLayer<Ant> = new MapLayer<Ant>();
   towers: MapLayer<Tower> = new MapLayer<Tower>();
+  empRemains: number[][][];
 
   round: number = 0;
   gold: [number, number];
@@ -20,20 +35,19 @@ export class GameData {
   hqPos: [number, number][] = [];
   antCdLv: [number, number] = [0, 0];
   antHpLv: [number, number] = [0, 0];
+  swCd: number[][];
+  activeDeflectors: ActiveDeflector[] = [];
 
   constructor(len: number, config: GameConfig) {
     this.len = len;
     this.gold = [config.initGold, config.initGold];
     this.hqHp = [config.initHp, config.initHp];
     this.pheromone = [new Pheromone(len, config.pheromone), new Pheromone(len, config.pheromone)];
+    this.empRemains = [twodimArray(2 * len - 1, () => 0), twodimArray(2 * len - 1, () => 0)];
+    this.swCd = genArray(2, () => genArray(4, () => 0));
     this.config = config;
 
-    let hqOffset = 2;
-    if (len <= 4) {
-      hqOffset = 0;
-    } else if (len <= 6) {
-      hqOffset = 1;
-    }
+    const hqOffset = 2;
     this.hqPos = [
       [hqOffset, len - 1],
       [2 * len - 2 - hqOffset, len - 1],
@@ -53,6 +67,66 @@ export class GameData {
     );
   }
 
+  newTowerCost(player: number) {
+    return (
+      ConfigHandler.config.newTowerCost *
+      2 ** this.towers.getByPredicate((t) => t.player === player).length
+    );
+  }
+
+  deploySuperWeapon(
+    player: number,
+    type: SuperWeaponType,
+    x: number,
+    y: number,
+    canvas: Konva.Layer | null,
+    animationInterval: number
+  ) {
+    if (this.swCd[player][type] > 0) {
+      console.warn(`Super weapon ${type} in cd ${this.swCd[player][type]}`);
+      return;
+    }
+    this.swCd[player][type] = ConfigHandler.config.superWeapon[type].cd;
+    if (type === SuperWeaponType.LightningStorm) {
+      this.ants
+        .getByRange(x, y, 3)
+        .filter((a) => a.hp > 0 && a.player !== player)
+        .forEach((ant) => (ant.hp -= 100));
+      if (canvas) {
+        this.ants.data
+          .filter((a) => a.hp <= 0)
+          .forEach((ant) => {
+            let antShape = canvas.findOne(`#ANT-${ant.id}`);
+            if (antShape) {
+              new Konva.Tween({
+                node: antShape,
+                duration: animationInterval / 1000,
+                opacity: 0,
+              }).play();
+            }
+          });
+      }
+    } else if (type === SuperWeaponType.EMPBlast) {
+      for (let coord of inDistance(x, y, 3)) {
+        this.empRemains[1 - player][coord[0]][coord[1]] = 10;
+      }
+    } else if (type === SuperWeaponType.Deflectors) {
+      this.activeDeflectors.push({
+        x,
+        y,
+        player,
+        remain: 10,
+      });
+    } else if (type === SuperWeaponType.EmergencyEvasion) {
+      this.ants
+        .getByRange(x, y, 3)
+        .filter((a) => a.hp > 0 && a.player === player)
+        .forEach((ant) => (ant.shield = 2));
+    } else {
+      console.warn(`Unknown super weapon type ${type}`);
+    }
+  }
+
   nextStep(canvas: Konva.Layer | null, animationInterval: number) {
     console.log(`Round: ${this.round}`);
     let tweenList: Konva.Tween[] = [];
@@ -62,11 +136,15 @@ export class GameData {
     // 1. Tower attack
     console.log("Tower attack");
     this.towers.data.forEach((tower) => {
+      if (this.empRemains[tower.player][tower.x][tower.y] > 0) {
+        console.log(`Tower ${tower.id} in under EMP`);
+        return;
+      }
       if (tower.cd > 0) {
         tower.cd--;
       }
       if (tower.cd === 0) {
-        const attacked = tower.attack(this.ants);
+        const attacked = tower.attack(this.ants, this.activeDeflectors);
         if (attacked.length > 0) {
           tower.cd = tower.config.interval;
         }
@@ -83,6 +161,7 @@ export class GameData {
         console.log(`Ant ${ant.id} is dead`);
         this.pheromone[ant.player].onDead(ant);
         alive = false;
+        this.gold[1 - ant.player] += ant.lv * 2 + 3;
       } else if (ant.path.length >= this.config.antAgeLimit) {
         console.log(`Ant ${ant.id} is too old`);
         this.pheromone[ant.player].onTooOld(ant);
@@ -91,7 +170,7 @@ export class GameData {
 
       if (!alive && canvas) {
         let antShape = canvas.findOne(`#ANT-${ant.id}`);
-        if (antShape) {
+        if (antShape?.opacity() !== 0) {
           tweenList.push(
             new Konva.Tween({
               node: antShape,
@@ -112,8 +191,7 @@ export class GameData {
 
     // 3. Ant move
     console.log("Ant move");
-    let reachedAnts: number[] = [];
-    this.ants.data.forEach((ant) => {
+    this.ants.data = this.ants.data.filter((ant) => {
       // Frozen check
       if (ant.state === AntState.Frozen) {
         console.log(`Ant ${ant.id} is frozen`);
@@ -131,7 +209,6 @@ export class GameData {
         this.hqHp[1 - ant.player] -= 1;
         console.log(`HQ of player ${1 - ant.player} is attacked by ${ant.id}`);
         this.pheromone[ant.player].onReached(ant);
-        reachedAnts.push(ant.id);
       }
 
       // Animation
@@ -156,20 +233,20 @@ export class GameData {
           console.warn(`Ant ${ant.id} doesn't have a shape`);
         }
       }
+
+      return !reached;
     });
-    this.ants.data = this.ants.data.filter((ant) => !reachedAnts.includes(ant.id));
 
     // 4. Generate new ants
     console.log("Generate new ants");
     for (let player = 0; player < 2; player++) {
       if (this.round % this.config.antCdLv[this.antCdLv[player]] === 0) {
-        const antHp = this.config.antHpLv[this.antHpLv[player]];
         let ant = new Ant(
           this.ants.useNextIdx(),
           player,
           this.hqPos[player][0],
           this.hqPos[player][1],
-          antHp
+          this.antHpLv[player]
         );
         console.log(`Ant ${ant.id} is spawned at (${ant.x}, ${ant.y})`);
         this.ants.data.push(ant);
@@ -180,7 +257,7 @@ export class GameData {
             y: sy,
             radius: renderConfig.cellRadius * 0.5,
             fill: renderConfig.playerColor(player),
-            stroke: "#ffffff",
+            stroke: "#FFFFFF",
             strokeWidth: 2,
             opacity: 0,
             id: `ANT-${ant.id}`,
@@ -193,9 +270,20 @@ export class GameData {
       }
     }
 
-    // 5. Other stuff
+    // 5. Round UP
     tweenList.forEach((tween) => tween.play());
+    for (let p = 0; p < 2; p++) {
+      for (let i = 0; i < 2 * this.len - 1; i++) {
+        for (let j = 0; j < 2 * this.len - 1; j++) {
+          this.empRemains[p][i][j] = Math.max(0, this.empRemains[p][i][j] - 1);
+        }
+      }
+      this.gold[p] += 1;
+      for (let i = 0; i < this.swCd[p].length; i++) {
+        this.swCd[p][i] = Math.max(0, this.swCd[p][i] - 1);
+      }
+    }
+    this.activeDeflectors = this.activeDeflectors.filter((d) => (d.remain -= 1) > 0);
     this.round += 1;
-    console.log();
   }
 }

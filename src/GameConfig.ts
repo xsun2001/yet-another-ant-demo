@@ -13,6 +13,7 @@ export const TowerConfig = z.object({
     aoeRange: z.number().optional(),
   }),
   baseType: z.number(),
+  cost: z.number(),
 });
 
 export type TowerConfig = z.infer<typeof TowerConfig>;
@@ -36,6 +37,8 @@ export const GameConfig = z.object({
   lvUpCost: z.number().array(),
   antAgeLimit: z.number().refine((v) => v >= 0),
   towers: TowerConfig.array(),
+  newTowerCost: z.number().refine((v) => v >= 0),
+  superWeapon: z.object({ cost: z.number(), cd: z.number() }).array(),
   pheromone: PheromoneConfig,
 });
 
@@ -50,19 +53,26 @@ export const DefaultConfig: GameConfig = {
   antAgeLimit: 64,
   // prettier-ignore
   towers: [
-    { type: 0,  name: "Base",    damage: 5, range: 4, interval: 2, baseType:-1, attack: { type: "normal" } },
-    { type: 1,  name: "Heavy",   damage:10, range: 4, interval: 2, baseType: 0, attack: { type: "normal" } },
-    { type: 11, name: "Heavy+",  damage:20, range: 5, interval: 2, baseType: 1, attack: { type: "normal" } },
-    { type: 12, name: "Ice",     damage: 8, range: 6, interval: 2, baseType: 1, attack: { type: "ice" } },
-    { type: 13, name: "Cannon",  damage:45, range: 5, interval: 3, baseType: 1, attack: { type: "normal" } },
-    { type: 2,  name: "Quick",   damage: 4, range: 4, interval: 1, baseType: 0, attack: { type: "normal" } },
-    { type: 21, name: "Quick+",  damage: 4, range: 5, interval: 1, baseType: 2, attack: { type: "normal", attackCount: 2 } },
-    { type: 22, name: "Double",  damage: 6, range: 6, interval: 1, baseType: 2, attack: { type: "normal", targetCount: 2 } },
-    { type: 23, name: "Sniper",  damage: 6, range: 8, interval: 1, baseType: 2, attack: { type: "normal" } },
-    { type: 3,  name: "Mortar",  damage: 9, range: 7, interval: 3, baseType: 0, attack: { type: "aoe", aoeRange: 1 } },
-    { type: 31, name: "Mortar+", damage:15, range: 8, interval: 3, baseType: 3, attack: { type: "aoe", aoeRange: 1 } },
-    { type: 32, name: "Pulse",   damage:10, range: 3, interval: 3, baseType: 3, attack: { type: "pulse" } },
-    { type: 33, name: "Missile", damage:20, range:10, interval: 5, baseType: 3, attack: { type: "aoe", aoeRange: 2 } },
+    { type: 0,  name: "Base",    damage: 5, range: 2, interval: 2, baseType:-1, cost:  15, attack: { type: "normal" } },
+    { type: 1,  name: "Heavy",   damage:10, range: 4, interval: 2, baseType: 0, cost:  60, attack: { type: "normal" } },
+    { type: 11, name: "Heavy+",  damage:20, range: 5, interval: 2, baseType: 1, cost: 100, attack: { type: "normal" } },
+    { type: 12, name: "Ice",     damage: 8, range: 6, interval: 2, baseType: 1, cost: 100, attack: { type: "ice" } },
+    { type: 13, name: "Cannon",  damage:45, range: 5, interval: 3, baseType: 1, cost: 100, attack: { type: "normal" } },
+    { type: 2,  name: "Quick",   damage: 4, range: 4, interval: 1, baseType: 0, cost:  60, attack: { type: "normal" } },
+    { type: 21, name: "Quick+",  damage: 4, range: 5, interval: 1, baseType: 2, cost: 100, attack: { type: "normal", attackCount: 2 } },
+    { type: 22, name: "Double",  damage: 6, range: 6, interval: 1, baseType: 2, cost: 100, attack: { type: "normal", targetCount: 2 } },
+    { type: 23, name: "Sniper",  damage: 6, range: 8, interval: 1, baseType: 2, cost: 100, attack: { type: "normal" } },
+    { type: 3,  name: "Mortar",  damage: 9, range: 7, interval: 3, baseType: 0, cost:  60, attack: { type: "aoe", aoeRange: 1 } },
+    { type: 31, name: "Mortar+", damage:15, range: 8, interval: 3, baseType: 3, cost: 100, attack: { type: "aoe", aoeRange: 1 } },
+    { type: 32, name: "Pulse",   damage:10, range: 3, interval: 3, baseType: 3, cost: 100, attack: { type: "pulse" } },
+    { type: 33, name: "Missile", damage:20, range:10, interval: 5, baseType: 3, cost: 100, attack: { type: "aoe", aoeRange: 2 } },
+  ],
+  newTowerCost: 15,
+  superWeapon: [
+    { cost: 150, cd: 100 },
+    { cost: 150, cd: 75 },
+    { cost: 100, cd: 55 },
+    { cost: 100, cd: 35 },
   ],
   pheromone: {
     tau0: 10,

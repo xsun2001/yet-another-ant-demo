@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { isPlayerHighland } from "./Coord";
 import { ConfigHandler } from "./GameConfig";
+import { GameData } from "./GameData";
 import { Tower } from "./Tower";
 
 const props = defineProps<{
@@ -10,11 +11,16 @@ const props = defineProps<{
   y: number;
   tower: Tower | undefined;
   autoPlaying: boolean;
+  gameData: GameData;
 }>();
 
 const emit = defineEmits<{
   (e: "updateTower", x: number, y: number, player: number, type: number): void;
 }>();
+
+const underEmp = computed(() => props.gameData.empRemains[props.player][props.x][props.y] > 0);
+const gold = computed(() => props.gameData.gold[props.player]);
+const newTowerCost = computed(() => props.gameData.newTowerCost(props.player));
 
 const config = computed(() =>
   props.tower ? ConfigHandler.towerConfig(props.tower?.config.type) : undefined
@@ -60,16 +66,18 @@ function updateTower(player: number, type: number) {
         <p>Range: {{ config.range }}</p>
         <p>Interval: {{ config.interval }}</p>
         <p>ATK Type: {{ attackType }}</p>
-        <template v-if="autoPlaying"> Stop AutoPlay to build tower </template>
+        <p v-if="autoPlaying">Stop AutoPlay to upgrade/downgrade tower</p>
+        <p v-else-if="underEmp">Cannot upgrade/downgrade tower under EMP</p>
         <template v-else>
           <v-btn
             block
             prepend-icon="mdi-chevron-up"
             v-for="t in nextLevel"
             :key="t.type"
+            :disabled="t.cost > gold"
             @click="updateTower(props.player, t.type)"
           >
-            Upgrade to [{{ t.name }}]
+            Upgrade to [{{ t.name }}] {{ t.cost > gold ? `Need ${t.cost}G` : "" }}
           </v-btn>
           <v-btn
             v-if="tower.config.type === 0"
@@ -90,10 +98,16 @@ function updateTower(player: number, type: number) {
         </template>
       </template>
       <template v-else-if="canBuild">
-        <template v-if="autoPlaying"> Stop AutoPlay to build tower </template>
+        <p v-if="autoPlaying">Stop AutoPlay to build tower</p>
+        <p v-else-if="underEmp">Cannot build tower under EMP</p>
         <template v-else>
-          <v-btn block prepend-icon="mdi-hammer" @click="updateTower(props.player, 0)">
-            Build New Tower
+          <v-btn
+            block
+            prepend-icon="mdi-hammer"
+            :disabled="newTowerCost > gold"
+            @click="updateTower(props.player, 0)"
+          >
+            Build New Tower {{ newTowerCost > gold ? `Need ${newTowerCost}G` : "" }}
           </v-btn>
         </template>
       </template>

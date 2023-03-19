@@ -192,6 +192,7 @@ function deconstructTowerOnly(x: number, y: number) {
     let tower = gameData.towers.getByPos(x, y)[0];
     if (tower) {
       gameData.towers.data = gameData.towers.data.filter((t) => t.id !== tower.id);
+      gameData.gold[tower.player] += gameData.newTowerCost(tower.player) * 0.8;
       const towerRect = mainLayer.findOne(`#TOWER-RECT-${tower.id}`) as Konva.Rect;
       const towerText = mainLayer.findOne(`#TOWER-TEXT-${tower.id}`) as Konva.Text;
       towerRect?.destroy();
@@ -215,6 +216,25 @@ function updateTower(x: number, y: number, player: number, type: number) {
 
     let tower = gameData.towers.getByPos(x, y)[0];
     if (tower) {
+      if (tower.config.baseType === type) {
+        // Downgrade
+        gameData.gold[player] += tower.config.cost * 0.8;
+      } else if (newConfig.baseType === tower.config.type) {
+        // Upgrade
+        if (newConfig.cost > gameData.gold[player]) {
+          console.warn(
+            `Player ${player} does not have enough gold to upgrade tower at [${x}, ${y}]`
+          );
+          return;
+        }
+        gameData.gold[player] -= newConfig.cost;
+      } else {
+        console.warn(
+          `Tower at [${x}, ${y}] cannot be upgraded from ${tower.config.type} to ${type}`
+        );
+        return;
+      }
+
       if (tower.player !== player) {
         console.warn(`Tower at [${x}, ${y}] is not owned by player ${player}`);
         return;
@@ -231,6 +251,12 @@ function updateTower(x: number, y: number, player: number, type: number) {
       towerRect?.destroy();
       towerText?.destroy();
     } else {
+      const newCost = gameData.newTowerCost(player);
+      if (newCost > gameData.gold[player]) {
+        console.warn(`Player ${player} does not have enough gold to build tower at [${x}, ${y}]`);
+        return;
+      }
+      gameData.gold[player] -= newCost;
       tower = new Tower(gameData.towers.useNextIdx(), player, x, y, newConfig);
       gameData.towers.push(tower);
     }
@@ -269,6 +295,10 @@ function updateTower(x: number, y: number, player: number, type: number) {
     ++towerUpdateKey.value;
   }
 }
+
+function deploySuperWeapon(x: number, y: number, player: number, type: number) {
+  gameData.deploySuperWeapon(player, type, x, y, mainLayer, animationInterval.value);
+}
 </script>
 
 <template>
@@ -287,6 +317,7 @@ function updateTower(x: number, y: number, player: number, type: number) {
         :selected-y="selectedPos[1]"
         :auto-playing="autoPlaying"
         @update-tower="updateTower"
+        @deploy-super-weapon="deploySuperWeapon"
       ></info-panel>
     </v-navigation-drawer>
 
