@@ -1,21 +1,24 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { GameData } from "./GameData";
+import { ConfigHandler } from "./GameConfig";
+import { Tower } from "./Tower";
 
 const props = defineProps<{
+  player: number;
   x: number;
   y: number;
-  gameData: GameData;
+  tower: Tower | undefined;
 }>();
 
 const emit = defineEmits<{
   (e: "updateTower", x: number, y: number, player: number, type: number): void;
 }>();
 
-const tower = computed(() => props.gameData.towers.getByPos(props.x, props.y)[0]);
-const config = computed(() => tower.value?.config);
+const config = computed(() =>
+  props.tower ? ConfigHandler.towerConfig(props.tower?.config.type) : undefined
+);
 const attackType = computed(() => {
-  let atk = tower.value?.config.attack;
+  let atk = props.tower?.config.attack;
   if (atk) {
     if (atk.type === "normal") {
       return `single ${atk.targetCount ?? 1} ${atk.attackCount ?? 1}`;
@@ -28,11 +31,13 @@ const attackType = computed(() => {
     return "Unknown";
   }
 });
-const nextLevel = computed(() => props.gameData.nextLevelTower(tower.value?.config.type) ?? []);
-const previousLevel = computed(() =>
-  props.gameData.previousLevelTower(tower.value?.config.type ?? 0)
+const nextLevel = computed(() =>
+  props.tower ? ConfigHandler.advanceOfTower(props.tower.config.type) : []
 );
-const isHighland = computed(() => props.gameData.highlandMask[props.x][props.y]);
+const previousLevel = computed(() =>
+  props.tower ? ConfigHandler.baseOfTower(props.tower.config.type) : undefined
+);
+const isHighland = computed(() => [props.x][props.y]);
 
 function updateTower(player: number, type: number) {
   emit("updateTower", props.x, props.y, player, type);
@@ -47,7 +52,6 @@ function updateTower(player: number, type: number) {
     </v-card-title>
     <v-card-text>
       <template v-if="tower && config">
-        <p>Player: {{ tower.player }}</p>
         <p>CD: {{ tower.cd }}</p>
         <p>Type: {{ config.name }}</p>
         <p>ATK: {{ config.damage }}</p>
@@ -57,23 +61,33 @@ function updateTower(player: number, type: number) {
         <v-btn
           block
           prepend-icon="mdi-chevron-up"
-          v-for="[id, name] in nextLevel"
-          :key="id"
-          @click="updateTower(tower.player, id)"
+          v-for="t in nextLevel"
+          :key="t.type"
+          @click="updateTower(props.player, t.type)"
         >
-          Upgrade to [{{ name }}]
+          Upgrade to [{{ t.name }}]
         </v-btn>
         <v-btn
+          v-if="tower.config.type === 0"
+          block
+          prepend-icon="mdi-selection-remove"
+          @click="updateTower(props.player, -1)"
+        >
+          Deconstruct
+        </v-btn>
+        <v-btn
+          v-else-if="previousLevel"
           block
           prepend-icon="mdi-chevron-down"
-          @click="updateTower(tower.player, previousLevel[0])"
+          @click="updateTower(props.player, previousLevel!.type)"
         >
-          {{ previousLevel[0] === -1 ? "Deconstruct" : `Downgrade to ${previousLevel[1]}` }}
+          Downgrade to [{{ previousLevel!.name }}]
         </v-btn>
       </template>
       <template v-else-if="isHighland">
-        <v-btn block prepend-icon="mdi-hammer" @click="updateTower(0, 0)">P0 Build</v-btn>
-        <v-btn block prepend-icon="mdi-hammer" @click="updateTower(1, 0)">P1 Build</v-btn>
+        <v-btn block prepend-icon="mdi-hammer" @click="updateTower(props.player, 0)"
+          >Build New Tower</v-btn
+        >
       </template>
       <template v-else> Tower cannot be built here. </template>
     </v-card-text>

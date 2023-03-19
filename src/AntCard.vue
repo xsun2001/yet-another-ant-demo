@@ -12,7 +12,6 @@ const ant = props.ant;
       Ant {{ ant.id }}
     </v-card-title>
     <v-card-text>
-      <p>Player: {{ ant.player }}</p>
       <p>HP: {{ ant.hp }} / {{ ant.maxHp }}</p>
       <p>State: {{ ant.state }}</p>
       <p>PathLen: {{ ant.path.length }}</p>

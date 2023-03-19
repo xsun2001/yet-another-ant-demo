@@ -97,6 +97,7 @@ export class Tower {
   y: number;
   config: TowerConfig;
   cd: number;
+
   constructor(id: number, player: number, x: number, y: number, config: TowerConfig) {
     this.id = id;
     this.player = player;
@@ -104,5 +105,23 @@ export class Tower {
     this.y = y;
     this.config = config;
     this.cd = 0;
+  }
+
+  attack(ants: MapLayer<Ant>): [Ant, number][] {
+    if (this.config.attack.type == "normal") {
+      return normal(this.config.attack.targetCount ?? 1, this.config.attack.attackCount ?? 1)(
+        this,
+        ants
+      );
+    } else if (this.config.attack.type == "ice") {
+      return ice()(this, ants);
+    } else if (this.config.attack.type == "aoe") {
+      return aoe(this.config.attack.aoeRange ?? 1)(this, ants);
+    } else if (this.config.attack.type == "pulse") {
+      return pulse()(this, ants);
+    } else {
+      console.warn("Unknown attack type: " + JSON.stringify(this.config.attack));
+      return [];
+    }
   }
 }

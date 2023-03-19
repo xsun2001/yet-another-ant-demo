@@ -1,36 +1,40 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { GameData } from "./GameData";
+import { MoveInfo } from "./Pheromone";
 
 const props = defineProps<{
-  x: number;
-  y: number;
-  player: number;
-  gameData: GameData;
+  info: MoveInfo;
 }>();
 
-const information = computed(() => props.gameData.moveInformation(props.x, props.y, props.player));
+const directionIcon = [
+  "mdi-arrow-bottom-right",
+  "mdi-arrow-top-right",
+  "mdi-arrow-up",
+  "mdi-arrow-top-left",
+  "mdi-arrow-bottom-left",
+  "mdi-arrow-down",
+];
 </script>
 
 <template>
   <v-card>
     <v-card-title>
       <v-icon icon="mdi-arrow-decision"></v-icon>
-      P{{ props.player }} Pheromone
+      Movement
     </v-card-title>
     <v-card-text>
       <p>
-        V: <code>{{ JSON.stringify(information.valid) }}</code>
+        V: <code>[{{ props.info.valid.map((v) => (v ? "✓" : "X")).join(", ") }}]</code>
       </p>
       <p>
-        τ: <code>[{{ information.tau.map((p) => p.toFixed(4)).join(", ") }}]</code>
+        τ: <code>[{{ props.info.tau.map((p) => p.toFixed(3)).join(", ") }}]</code>
       </p>
       <p>
-        η: <code>[{{ information.eta.map((p) => p.toFixed(4)).join(", ") }}]</code>
+        η: <code>[{{ props.info.eta.map((p) => p.toFixed(3)).join(", ") }}]</code>
       </p>
       <p>
-        P: <code>[{{ information.prob.map((p) => p.toFixed(4)).join(", ") }}]</code>
+        P: <code>[{{ props.info.prob.map((p) => p.toFixed(3)).join(", ") }}]</code>
       </p>
+      <p>Direction: <v-icon :icon="directionIcon[props.info.dir]"></v-icon></p>
     </v-card-text>
   </v-card>
 </template>

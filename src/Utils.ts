@@ -31,12 +31,21 @@ export function probabilityChoose(prob: number[]): number {
   return prob.length - 1;
 }
 
-// TODO: Configurable
 export const renderConfig = {
   cellRadius: 20,
-  offsetX: 50,
-  offsetY: 50,
-  playerColor: ["red", "blue"],
+  offsetX: 110,
+  offsetY: 110,
+  color: {
+    p0: "#FF0000",
+    p1: "#0000FF",
+    path: "#87CEFA",
+    highland: "#A9A9A9",
+    p0Highland: "#F08080",
+    p1Highland: "#7FFFD4",
+  },
+  playerColor: (p: number) => {
+    return p === 0 ? renderConfig.color.p0 : renderConfig.color.p1;
+  },
 };
 
 // Coordinate to Screen position
