@@ -1,4 +1,4 @@
-import { ActiveDeflector } from "./GameData";
+import { ActiveSuperWeapon, SuperWeaponType } from "./GameData";
 import { Ant, AntState } from "./Ant";
 import { TowerConfig } from "./GameConfig";
 import { MapLayer } from "./MapLayer";
@@ -7,7 +7,7 @@ import * as Coord from "./Coord";
 export type AttackFunc = (
   tower: Tower,
   ants: MapLayer<Ant>,
-  deflectors: ActiveDeflector[]
+  activeSw: ActiveSuperWeapon[]
 ) => [Ant, number][];
 
 function findTargetAnts(tower: Tower, ants: MapLayer<Ant>): Ant[] {
@@ -31,7 +31,7 @@ export function damageAndLog(
   tower: Tower,
   ant: Ant,
   damage: number,
-  deflectors: ActiveDeflector[]
+  activeSw: ActiveSuperWeapon[]
 ) {
   const previousHp = ant.hp;
   if (ant.shield > 0) {
@@ -40,8 +40,9 @@ export function damageAndLog(
       `Tower ${tower.id} attacks Ant ${ant.id} | Shield ${ant.shield + 1} -> ${ant.shield}`
     );
   } else if (
-    deflectors.some(
+    activeSw.some(
       (d) =>
+        d.type === SuperWeaponType.Deflectors &&
         Coord.distance(d.x, d.y, ant.x, ant.y) <= 3 &&
         d.player === ant.player &&
         damage < ant.maxHp / 2
@@ -55,12 +56,12 @@ export function damageAndLog(
 }
 
 export function normal(targetCount: number, attackCount: number): AttackFunc {
-  return (tower, ants, deflectors) => {
+  return (tower, ants, activeSw) => {
     let attacked: [Ant, number][] = [];
     for (let i = 0; i < attackCount; i++) {
       let targets = findTargetAnts(tower, ants);
       for (let j = 0; j < targetCount && j < targets.length; j++) {
-        damageAndLog(tower, targets[j], tower.config.damage, deflectors);
+        damageAndLog(tower, targets[j], tower.config.damage, activeSw);
         attacked.push([targets[j], tower.config.damage]);
       }
     }
@@ -69,12 +70,12 @@ export function normal(targetCount: number, attackCount: number): AttackFunc {
 }
 
 export function ice(): AttackFunc {
-  return (tower, ants, deflectors: ActiveDeflector[]) => {
+  return (tower, ants, activeSw: ActiveSuperWeapon[]) => {
     let targets = findTargetAnts(tower, ants);
     if (targets.length == 0) {
       return [];
     }
-    damageAndLog(tower, targets[0], tower.config.damage, deflectors);
+    damageAndLog(tower, targets[0], tower.config.damage, activeSw);
     targets[0].state = AntState.Frozen;
     return [[targets[0], tower.config.damage]];
   };
@@ -87,19 +88,19 @@ function aoeDamageAt(
   range: number,
   damage: number,
   ants: MapLayer<Ant>,
-  deflectors: ActiveDeflector[]
+  activeSw: ActiveSuperWeapon[]
 ): [Ant, number][] {
   return ants
     .getByRange(x, y, range)
     .filter((ant) => ant.hp > 0 && ant.player !== tower.player)
     .map((ant) => {
-      damageAndLog(tower, ant, damage, deflectors);
+      damageAndLog(tower, ant, damage, activeSw);
       return [ant, damage];
     });
 }
 
 export function aoe(damageRange: number): AttackFunc {
-  return (tower, ants, deflectors) => {
+  return (tower, ants, activeSw) => {
     let targets = findTargetAnts(tower, ants);
     if (targets.length == 0) {
       return [];
@@ -111,13 +112,13 @@ export function aoe(damageRange: number): AttackFunc {
       damageRange,
       tower.config.damage,
       ants,
-      deflectors
+      activeSw
     );
   };
 }
 
 export function pulse(): AttackFunc {
-  return (tower, ants, deflectors) => {
+  return (tower, ants, activeSw) => {
     if (findTargetAnts(tower, ants).length == 0) {
       return [];
     }
@@ -128,7 +129,7 @@ export function pulse(): AttackFunc {
       tower.config.range,
       tower.config.damage,
       ants,
-      deflectors
+      activeSw
     );
   };
 }
@@ -150,7 +151,7 @@ export class Tower {
     this.cd = 0;
   }
 
-  attack(ants: MapLayer<Ant>, deflectors: ActiveDeflector[]): [Ant, number][] {
+  attack(ants: MapLayer<Ant>, activeSw: ActiveSuperWeapon[]): [Ant, number][] {
     let attackFunc;
     if (this.config.attack.type == "normal") {
       attackFunc = normal(this.config.attack.targetCount ?? 1, this.config.attack.attackCount ?? 1);
@@ -164,6 +165,6 @@ export class Tower {
       console.warn("Unknown attack type: " + JSON.stringify(this.config.attack));
       return [];
     }
-    return attackFunc(this, ants, deflectors);
+    return attackFunc(this, ants, activeSw);
   }
 }
