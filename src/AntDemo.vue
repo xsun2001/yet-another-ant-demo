@@ -329,9 +329,7 @@ function deploySuperWeapon(x: number, y: number, player: number, type: number) {
     ></controller>
 
     <v-main>
-      <div class="konva-container" v-konva-div></div>
+      <div style="display: flex; align-items: center; justify-content: center" v-konva-div></div>
     </v-main>
   </v-layout>
 </template>
-
-<style scoped></style>

@@ -77,9 +77,9 @@ export const DefaultConfig: GameConfig = {
   pheromone: {
     tau0: 10,
     rho: 0.96,
-    tauOnDead: -5,
+    tauOnDead: -8,
     tauOnReached: 10,
-    tauOnTooOld: -3,
+    tauOnTooOld: -5,
     eta: [1.25, 1, 0.75],
   },
 };

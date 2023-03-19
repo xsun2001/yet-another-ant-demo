@@ -14,10 +14,11 @@ export enum SuperWeaponType {
   EmergencyEvasion = 3,
 }
 
-export interface ActiveDeflector {
+export interface ActiveSuperWeapon {
   x: number;
   y: number;
   player: number;
+  type: SuperWeaponType;
   remain: number;
 }
 export class GameData {
@@ -36,7 +37,7 @@ export class GameData {
   antCdLv: [number, number] = [0, 0];
   antHpLv: [number, number] = [0, 0];
   swCd: number[][];
-  activeDeflectors: ActiveDeflector[] = [];
+  activeSuperWeapon: ActiveSuperWeapon[] = [];
 
   constructor(len: number, config: GameConfig) {
     this.len = len;
@@ -88,33 +89,23 @@ export class GameData {
     }
     this.swCd[player][type] = ConfigHandler.config.superWeapon[type].cd;
     if (type === SuperWeaponType.LightningStorm) {
-      this.ants
-        .getByRange(x, y, 3)
-        .filter((a) => a.hp > 0 && a.player !== player)
-        .forEach((ant) => (ant.hp -= 100));
-      if (canvas) {
-        this.ants.data
-          .filter((a) => a.hp <= 0)
-          .forEach((ant) => {
-            let antShape = canvas.findOne(`#ANT-${ant.id}`);
-            if (antShape) {
-              new Konva.Tween({
-                node: antShape,
-                duration: animationInterval / 1000,
-                opacity: 0,
-              }).play();
-            }
-          });
-      }
+      this.activeSuperWeapon.push({
+        x,
+        y,
+        player,
+        type,
+        remain: 10,
+      });
     } else if (type === SuperWeaponType.EMPBlast) {
       for (let coord of inDistance(x, y, 3)) {
         this.empRemains[1 - player][coord[0]][coord[1]] = 10;
       }
     } else if (type === SuperWeaponType.Deflectors) {
-      this.activeDeflectors.push({
+      this.activeSuperWeapon.push({
         x,
         y,
         player,
+        type,
         remain: 10,
       });
     } else if (type === SuperWeaponType.EmergencyEvasion) {
@@ -133,7 +124,21 @@ export class GameData {
 
     this.pheromone.forEach((p) => p.globalDecay());
 
-    // 1. Tower attack
+    // 1. Lightning Storm
+    console.log("Lightning storm");
+    this.activeSuperWeapon
+      .filter((sw) => sw.type === SuperWeaponType.LightningStorm)
+      .forEach((sw) => {
+        this.ants
+          .getByRange(sw.x, sw.y, 3)
+          .filter((ant) => ant.player !== sw.player)
+          .forEach((ant) => {
+            console.log(`Ant ${ant.id} HP ${ant.hp} -> ${ant.hp - 100}`);
+            ant.hp -= 100;
+          });
+      });
+
+    // 2. Tower attack
     console.log("Tower attack");
     this.towers.data.forEach((tower) => {
       if (this.empRemains[tower.player][tower.x][tower.y] > 0) {
@@ -144,7 +149,7 @@ export class GameData {
         tower.cd--;
       }
       if (tower.cd === 0) {
-        const attacked = tower.attack(this.ants, this.activeDeflectors);
+        const attacked = tower.attack(this.ants, this.activeSuperWeapon);
         if (attacked.length > 0) {
           tower.cd = tower.config.interval;
         }
@@ -153,7 +158,7 @@ export class GameData {
       }
     });
 
-    // 2. Filter out dead / too-old ants
+    // 3. Filter out dead / too-old ants
     console.log("Pre-filter ants");
     this.ants.data = this.ants.data.filter((ant) => {
       let alive = true;
@@ -170,7 +175,7 @@ export class GameData {
 
       if (!alive && canvas) {
         let antShape = canvas.findOne(`#ANT-${ant.id}`);
-        if (antShape?.opacity() !== 0) {
+        if (antShape) {
           tweenList.push(
             new Konva.Tween({
               node: antShape,
@@ -189,7 +194,7 @@ export class GameData {
       return alive;
     });
 
-    // 3. Ant move
+    // 4. Ant move
     console.log("Ant move");
     this.ants.data = this.ants.data.filter((ant) => {
       // Frozen check
@@ -237,7 +242,7 @@ export class GameData {
       return !reached;
     });
 
-    // 4. Generate new ants
+    // 5. Generate new ants
     console.log("Generate new ants");
     for (let player = 0; player < 2; player++) {
       if (this.round % this.config.antCdLv[this.antCdLv[player]] === 0) {
@@ -270,7 +275,7 @@ export class GameData {
       }
     }
 
-    // 5. Round UP
+    // 6. Round UP
     tweenList.forEach((tween) => tween.play());
     for (let p = 0; p < 2; p++) {
       for (let i = 0; i < 2 * this.len - 1; i++) {
@@ -283,7 +288,7 @@ export class GameData {
         this.swCd[p][i] = Math.max(0, this.swCd[p][i] - 1);
       }
     }
-    this.activeDeflectors = this.activeDeflectors.filter((d) => (d.remain -= 1) > 0);
+    this.activeSuperWeapon = this.activeSuperWeapon.filter((d) => (d.remain -= 1) > 0);
     this.round += 1;
   }
 }

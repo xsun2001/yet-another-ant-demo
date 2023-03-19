@@ -16,6 +16,7 @@ export function arrayEq<T>(a1: T[], a2: T[]): boolean {
   return true;
 }
 
+// 2 * offset + 29 * radius = width/height
 export const renderConfig = {
   cellRadius: 20,
   offsetX: 110,
