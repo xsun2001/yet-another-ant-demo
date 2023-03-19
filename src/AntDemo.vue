@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, Ref } from "@vue/reactivity";
+import { reactive, ref, Ref } from "@vue/reactivity";
 import Konva from "konva";
 import { watch } from "vue";
 import * as Coord from "./Coord";
@@ -30,8 +30,7 @@ import Controller from "./Controller.vue";
  * 3. nextStep -> Create new ant node / Animate ant / Remove dead nodes
  */
 
-const round = ref(0);
-const gameData = new GameData(Coord.MAP_LEN, DefaultConfig);
+const gameData = reactive(new GameData(Coord.MAP_LEN, DefaultConfig));
 
 const animationInterval = ref(200);
 const autoplayInterval = ref(300);
@@ -154,7 +153,6 @@ const vKonvaDiv = {
 function nextRound() {
   if (gameData) {
     gameData.nextStep(mainLayer, animationInterval.value);
-    round.value = gameData.round;
     updateSelectedData();
   }
 }
@@ -202,7 +200,6 @@ function deconstructTowerOnly(x: number, y: number) {
     }
   }
 }
-
 function updateTower(x: number, y: number, player: number, type: number) {
   console.log(`Update tower at (${x}, ${y}) to ${type} for player ${player}`);
   if (type === -1) {
@@ -283,15 +280,22 @@ function updateTower(x: number, y: number, player: number, type: number) {
       :color="i === 1 ? '#ff8484' : '#00b3ff'"
     >
       <info-panel
+        :key="towerUpdateKey"
         :player="i - 1"
         :game-data="gameData"
         :selected-x="selectedPos[0]"
         :selected-y="selectedPos[1]"
+        :auto-playing="autoPlaying"
         @update-tower="updateTower"
       ></info-panel>
     </v-navigation-drawer>
 
-    <controller :game-data="gameData"></controller>
+    <controller
+      :round="gameData.round"
+      :auto-playing="autoPlaying"
+      @next-round="nextRound"
+      @toggle-auto-playing="autoPlay"
+    ></controller>
 
     <v-main>
       <div class="konva-container" v-konva-div></div>

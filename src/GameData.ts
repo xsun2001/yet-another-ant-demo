@@ -122,12 +122,7 @@ export class GameData {
       }
 
       // Pheromone move
-      let prob = this.antMove(ant).prob;
-      if (prob.reduce((allZero, cur) => allZero && cur == 0, true)) {
-        console.warn(`Ant ${ant.id} is stuck`);
-        return;
-      }
-      let dir = probabilityChoose(prob);
+      let dir = this.antMove(ant).dir;
       let [nx, ny] = ant.move(dir);
 
       // Check reached

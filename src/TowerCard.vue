@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { isPlayerHighland } from "./Coord";
 import { ConfigHandler } from "./GameConfig";
 import { Tower } from "./Tower";
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   x: number;
   y: number;
   tower: Tower | undefined;
+  autoPlaying: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -37,7 +39,7 @@ const nextLevel = computed(() =>
 const previousLevel = computed(() =>
   props.tower ? ConfigHandler.baseOfTower(props.tower.config.type) : undefined
 );
-const isHighland = computed(() => [props.x][props.y]);
+const canBuild = computed(() => isPlayerHighland(props.x, props.y, props.player));
 
 function updateTower(player: number, type: number) {
   emit("updateTower", props.x, props.y, player, type);
@@ -58,36 +60,42 @@ function updateTower(player: number, type: number) {
         <p>Range: {{ config.range }}</p>
         <p>Interval: {{ config.interval }}</p>
         <p>ATK Type: {{ attackType }}</p>
-        <v-btn
-          block
-          prepend-icon="mdi-chevron-up"
-          v-for="t in nextLevel"
-          :key="t.type"
-          @click="updateTower(props.player, t.type)"
-        >
-          Upgrade to [{{ t.name }}]
-        </v-btn>
-        <v-btn
-          v-if="tower.config.type === 0"
-          block
-          prepend-icon="mdi-selection-remove"
-          @click="updateTower(props.player, -1)"
-        >
-          Deconstruct
-        </v-btn>
-        <v-btn
-          v-else-if="previousLevel"
-          block
-          prepend-icon="mdi-chevron-down"
-          @click="updateTower(props.player, previousLevel!.type)"
-        >
-          Downgrade to [{{ previousLevel!.name }}]
-        </v-btn>
+        <template v-if="autoPlaying"> Stop AutoPlay to build tower </template>
+        <template v-else>
+          <v-btn
+            block
+            prepend-icon="mdi-chevron-up"
+            v-for="t in nextLevel"
+            :key="t.type"
+            @click="updateTower(props.player, t.type)"
+          >
+            Upgrade to [{{ t.name }}]
+          </v-btn>
+          <v-btn
+            v-if="tower.config.type === 0"
+            block
+            prepend-icon="mdi-selection-remove"
+            @click="updateTower(props.player, -1)"
+          >
+            Deconstruct
+          </v-btn>
+          <v-btn
+            v-else-if="previousLevel"
+            block
+            prepend-icon="mdi-chevron-down"
+            @click="updateTower(props.player, previousLevel!.type)"
+          >
+            Downgrade to [{{ previousLevel!.name }}]
+          </v-btn>
+        </template>
       </template>
-      <template v-else-if="isHighland">
-        <v-btn block prepend-icon="mdi-hammer" @click="updateTower(props.player, 0)"
-          >Build New Tower</v-btn
-        >
+      <template v-else-if="canBuild">
+        <template v-if="autoPlaying"> Stop AutoPlay to build tower </template>
+        <template v-else>
+          <v-btn block prepend-icon="mdi-hammer" @click="updateTower(props.player, 0)">
+            Build New Tower
+          </v-btn>
+        </template>
       </template>
       <template v-else> Tower cannot be built here. </template>
     </v-card-text>

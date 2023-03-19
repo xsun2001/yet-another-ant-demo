@@ -12,6 +12,7 @@ const props = defineProps<{
   gameData: GameData;
   selectedX: number;
   selectedY: number;
+  autoPlaying: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -35,8 +36,8 @@ const selectedAnt = computed(() =>
     .filter((a) => a.player === props.player)
 );
 
-function updateTower(player: number, type: number) {
-  emit("updateTower", props.selectedX, props.selectedY, player, type);
+function updateTower(x: number, y: number, player: number, type: number) {
+  emit("updateTower", x, y, player, type);
 }
 </script>
 
@@ -45,12 +46,11 @@ function updateTower(player: number, type: number) {
   <template v-if="selectedValid">
     <pheromone-card v-if="moveInfo" :info="moveInfo"></pheromone-card>
     <tower-card
-      v-if="selectedTower"
       :player="player"
       :x="selectedX"
       :y="selectedY"
       :tower="selectedTower"
-      :key="selectedTower.id"
+      :auto-playing="autoPlaying"
       @update-tower="updateTower"
     ></tower-card>
     <ant-card v-for="ant in selectedAnt" :ant="ant" :key="ant.id"></ant-card>

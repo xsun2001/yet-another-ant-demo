@@ -162,3 +162,7 @@ export function isP0Highland(x: number, y: number): boolean {
 export function isP1Highland(x: number, y: number): boolean {
   return map[x][y] === 3;
 }
+
+export function isPlayerHighland(x: number, y: number, player: number): boolean {
+  return map[x][y] === player + 2;
+}
