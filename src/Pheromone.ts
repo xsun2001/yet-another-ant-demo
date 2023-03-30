@@ -18,7 +18,7 @@ export class Pheromone {
 
   constructor(len: number, config: PheromoneConfig) {
     this.len = len;
-    this.value = twodimArray(2 * len - 1, () => config.tau0);
+    this.value = twodimArray(2 * len - 1, () => config.tau0 + Math.random() * 4.0 - 2.0);
     this.config = config;
   }
 
@@ -88,7 +88,7 @@ export class Pheromone {
     );
     const tau = coord.map(([x, y], dir) => (valid[dir] ? this.value[x][y] : 0));
     const eta = valid.map((valid, dir) => (valid ? this.etaTarget(x, y, dir, target) : 0));
-    const prob = valid.map((valid, dir) => (valid ? tau[dir] * eta[dir] : 0));
+    const prob = valid.map((valid, dir) => (valid ? tau[dir] * eta[dir] : -10));
     const dir = prob.indexOf(Math.max(...prob));
 
     return {

@@ -88,17 +88,23 @@ export class GameData {
       return;
     }
     this.swCd[player][type] = ConfigHandler.config.superWeapon[type].cd;
+
+    if (this.gold[player] < ConfigHandler.config.superWeapon[type].cost) {
+      console.warn(`Not enough gold to deploy super weapon ${type}`);
+    }
+    this.gold[player] -= ConfigHandler.config.superWeapon[type].cost;
+
     if (type === SuperWeaponType.LightningStorm) {
       this.activeSuperWeapon.push({
         x,
         y,
         player,
         type,
-        remain: 10,
+        remain: 20,
       });
     } else if (type === SuperWeaponType.EMPBlast) {
       for (let coord of inDistance(x, y, 3)) {
-        this.empRemains[1 - player][coord[0]][coord[1]] = 10;
+        this.empRemains[1 - player][coord[0]][coord[1]] = 20;
       }
     } else if (type === SuperWeaponType.Deflectors) {
       this.activeSuperWeapon.push({
@@ -106,7 +112,7 @@ export class GameData {
         y,
         player,
         type,
-        remain: 10,
+        remain: 20,
       });
     } else if (type === SuperWeaponType.EmergencyEvasion) {
       this.ants
@@ -166,7 +172,7 @@ export class GameData {
         console.log(`Ant ${ant.id} is dead`);
         this.pheromone[ant.player].onDead(ant);
         alive = false;
-        this.gold[1 - ant.player] += ant.lv * 2 + 3;
+        this.gold[1 - ant.player] += (ant.lv + 1) * 3;
       } else if (ant.path.length >= this.config.antAgeLimit) {
         console.log(`Ant ${ant.id} is too old`);
         this.pheromone[ant.player].onTooOld(ant);
