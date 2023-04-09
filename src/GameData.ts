@@ -36,6 +36,7 @@ export class GameData {
   hqPos: [number, number][] = [];
   antCdLv: [number, number] = [0, 0];
   antHpLv: [number, number] = [0, 0];
+  roundGoldLv: [number, number] = [0, 0];
   swCd: number[][];
   activeSuperWeapon: ActiveSuperWeapon[] = [];
 
@@ -220,6 +221,7 @@ export class GameData {
         this.hqHp[1 - ant.player] -= 1;
         console.log(`HQ of player ${1 - ant.player} is attacked by ${ant.id}`);
         this.pheromone[ant.player].onReached(ant);
+        this.gold[ant.player] += this.config.goalGold;
       }
 
       // Animation
@@ -289,7 +291,7 @@ export class GameData {
           this.empRemains[p][i][j] = Math.max(0, this.empRemains[p][i][j] - 1);
         }
       }
-      this.gold[p] += 1;
+      this.gold[p] += this.config.roundGoldLv[this.roundGoldLv[p]];
       for (let i = 0; i < this.swCd[p].length; i++) {
         this.swCd[p][i] = Math.max(0, this.swCd[p][i] - 1);
       }
