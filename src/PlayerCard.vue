@@ -7,11 +7,21 @@ const props = defineProps<{
   gameData: GameData;
 }>();
 
-const upgradeIcon = ["mdi-speedometer", "mdi-heart-plus"];
-const upgradeName = ["Ant CD", "Ant HP"];
+const upgradeIcon = ["mdi-speedometer", "mdi-heart-plus", "mdi-currency-usd "];
+const upgradeName = ["Ant CD", "Ant HP", "Round Gold"];
 
 function lvArray(type: number) {
-  return type === 0 ? props.gameData.antCdLv : props.gameData.antHpLv;
+  switch (type) {
+    case 0:
+      return props.gameData.antCdLv;
+      break;
+    case 1:
+      return props.gameData.antHpLv;
+    case 2:
+      return props.gameData.roundGoldLv;
+    default:
+      break;
+  }
 }
 
 function neededGold(type: number) {
@@ -35,7 +45,8 @@ function upgrade(type: number) {
       <p>Gold: {{ gameData.gold[player] }}</p>
       <p>Ant CD LV: {{ gameData.antCdLv[player] }}</p>
       <p>Ant HP LV: {{ gameData.antHpLv[player] }}</p>
-      <template v-for="i in 2">
+      <p>Gold Earning LV: {{ gameData.roundGoldLv[player] }}</p>
+      <template v-for="i in 3">
         <v-btn
           block
           v-if="lvArray(i - 1)[props.player] < 2"
